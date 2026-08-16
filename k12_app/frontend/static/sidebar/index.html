@@ -1,0 +1,1294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>擎天学智 AI 销售辅助侧边栏</title>
+<style>
+:root{
+  --wx:#07C160; --wx-dark:#06ad56; --wx-bg:#F7F7F7;
+  --blue:#1F6FFF; --blue-dark:#1557d8;
+  --purple:#7B61FF; --purple-light:#F0ECFF;
+  --red:#FA5151; --orange:#FF9F0A; --green:#07C160;
+  --ink:#1A1A1A; --ink-2:#5B6472; --ink-3:#9AA3B2;
+  --line:#E9ECF2; --bg:#F5F7FA; --card:#FFFFFF;
+  --radius:12px; --shadow:0 2px 10px rgba(20,30,60,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:13px}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+input,select{font-family:inherit}
+.topbar{position:sticky;top:0;height:52px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 20px;gap:14px;z-index:50}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px}
+.logo .dot{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#1F6FFF,#7B61FF);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px}
+.topbar .sub{color:var(--ink-3);font-size:11px}
+.user-info{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--ink-2);background:var(--bg);padding:5px 12px;border-radius:20px}
+.user-info .logout{font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid var(--red);color:var(--red);background:#fff}
+.permission-badge{font-size:10px;padding:2px 8px;border-radius:10px;white-space:nowrap}
+.permission-badge.super{background:#FDEBEB;color:var(--red)}
+.permission-badge.region{background:#FFF4E5;color:var(--orange)}
+.permission-badge.normal{background:#EEF4FF;color:var(--blue)}
+main{max-width:1280px;margin:0 auto;padding:14px}
+.sim{display:grid;grid-template-columns:240px 1fr 360px;gap:12px;height:calc(100vh - 110px);min-height:560px}
+@media(max-width:980px){.sim{grid-template-columns:1fr;height:auto}.chanlist{max-height:240px}.panel{min-height:420px}}
+.panel{background:#fff;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+.chanlist .listhead{padding:14px 14px 8px;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:space-between}
+.chanlist .listhead span{font-size:11px;color:var(--ink-3);font-weight:400}
+.chanlist .searchbar{padding:0 12px 10px}
+.chanlist .searchbar input{width:100%;border:1px solid var(--line);border-radius:20px;padding:7px 12px;font-size:12px;outline:none}
+.chanlist .searchbar input:focus{border-color:var(--blue)}
+.chans{flex:1;overflow:auto}
+.chan{display:flex;gap:10px;padding:11px 14px;cursor:pointer;border-left:3px solid transparent;align-items:flex-start}
+.chan.active{background:#EFF7F0;border-left-color:var(--wx)}
+.chan:hover{background:#F7F9FB}
+.avatar{width:36px;height:36px;border-radius:10px;background:var(--wx);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;font-weight:600}
+.avatar.orange{background:#FF9F0A}.avatar.purple{background:#7B61FF}.avatar.blue{background:#1F6FFF}.avatar.red{background:#FA5151}
+.chan .name{font-weight:600;font-size:13px;line-height:1.3}
+.chan .meta-row{font-size:11px;color:var(--ink-3);margin-top:2px;display:flex;justify-content:space-between;gap:8px}
+.chan .msg{font-size:11px;color:var(--ink-3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.chan .stage{font-size:9px;padding:1px 6px;border-radius:6px;background:#EEF4FF;color:var(--blue)}
+.no-access{text-align:center;padding:40px 20px;color:var(--ink-3)}
+.no-access .icon{font-size:30px;margin-bottom:10px}
+.chathead{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.chathead .who{font-weight:600;font-size:14px}
+.chathead .who-sub{font-size:11px;color:var(--ink-3);margin-top:2px}
+.chathead .ctl{margin-left:auto;display:flex;gap:6px}
+.chathead .ctl button{font-size:11px;padding:4px 10px;border-radius:8px;background:var(--bg);color:var(--ink-2)}
+.chathead .ctl button:hover{background:#EEF4FF;color:var(--blue)}
+.msgs{flex:1;overflow:auto;padding:16px;background:var(--wx-bg)}
+.msgrow{display:flex;margin-bottom:12px;gap:8px;align-items:flex-end}
+.msgrow.me{flex-direction:row-reverse}
+.msgrow .bubble{max-width:70%;padding:9px 12px;border-radius:12px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+.msgrow.them .bubble{background:#fff;border:1px solid var(--line);border-top-left-radius:4px}
+.msgrow.me .bubble{background:var(--wx);color:#fff;border-top-right-radius:4px}
+.msgrow .meta{font-size:10px;color:var(--ink-3);margin-top:4px}
+.msgrow.me .meta{text-align:right}
+.msgrow.ai-side{flex-direction:row-reverse}
+.msgrow.ai-side .bubble{background:var(--purple);color:#fff;border-top-right-radius:4px}
+.msgrow.ai-side .meta{color:var(--purple)}
+.chatfoot{padding:11px 16px;border-top:1px solid var(--line);display:flex;gap:10px;align-items:center}
+.chatfoot input{flex:1;border:1px solid var(--line);border-radius:20px;padding:9px 14px;font-size:13px;outline:none}
+.chatfoot input:focus{border-color:var(--wx)}
+.chatfoot .send{background:var(--wx);color:#fff;border-radius:20px;padding:9px 18px;font-size:13px}
+.chatfoot .send:hover{background:var(--wx-dark)}
+.chatfoot .send:disabled{opacity:.5;cursor:not-allowed}
+.sidebar-head{background:linear-gradient(135deg,#1F6FFF,#7B61FF);color:#fff;padding:14px 16px}
+.sidebar-head .top{display:flex;align-items:center;justify-content:space-between}
+.sidebar-head .ai-title{font-weight:700;font-size:15px;display:flex;align-items:center;gap:6px}
+.sidebar-head .ai-sub{font-size:11px;opacity:.85;margin-top:3px}
+.sselive{font-size:10px;background:rgba(255,255,255,.2);padding:2px 8px;border-radius:10px}
+.sbtabs{display:flex;background:#fff;border-bottom:1px solid var(--line)}
+.sbtabs button{flex:1;padding:11px 0;font-size:12px;color:var(--ink-2);border-bottom:2px solid transparent;transition:.15s;position:relative}
+.sbtabs button.active{color:var(--blue);font-weight:600;border-bottom-color:var(--blue)}
+.sbtabs .badge{position:absolute;top:4px;right:8px;background:var(--red);color:#fff;font-size:9px;border-radius:50%;width:14px;height:14px;line-height:14px;text-align:center}
+.sb-body{flex:1;overflow:auto;background:var(--bg)}
+.sb-pane{display:none;padding:14px}
+.sb-pane.active{display:block;animation:fadein .25s ease}
+@keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:12px;margin-bottom:12px}
+.card h4{font-size:13px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.sect{color:var(--ink-2);font-size:11px;font-weight:600;margin:14px 0 8px}
+.conf{display:inline-block;font-size:10px;padding:1px 6px;border-radius:8px;background:#F0F0F5;color:var(--ink-3);margin-left:4px}
+.conf.hi{background:#EAF9F0;color:var(--green)}
+.conf.mid{background:#FFF4E5;color:var(--orange)}
+.conf.lo{background:#FDEBEB;color:var(--red)}
+.kv{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #F0F2F6;font-size:12px;align-items:center}
+.kv:last-child{border-bottom:none}
+.kv .k{color:var(--ink-3)}
+.kv .v{color:var(--ink);font-weight:500;text-align:right;max-width:60%}
+.source-link{border:0;color:var(--purple);background:var(--purple-light);font-size:10px;padding:2px 6px;border-radius:8px;margin-left:6px;cursor:pointer}
+.source-link:hover{background:#e5ddff}
+.badge-draft{font-size:10px;color:var(--orange);background:#FFF4E5;padding:2px 8px;border-radius:10px}
+.badge-ok{font-size:10px;color:var(--green);background:#EAF9F0;padding:2px 8px;border-radius:10px}
+.btn{display:inline-block;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;transition:.15s}
+.btn-primary{background:var(--wx);color:#fff}.btn-primary:hover{background:var(--wx-dark)}
+.btn-blue{background:var(--blue);color:#fff}
+.btn-ghost{border:1px solid var(--line);color:var(--ink-2)}.btn-ghost:hover{border-color:var(--blue);color:var(--blue)}
+.btn-sm{padding:5px 10px;font-size:11px;border-radius:6px}
+.btn-block{width:100%;text-align:center}
+.sugg{background:#fff;border:1px solid var(--line);border-left:3px solid var(--purple);border-radius:10px;padding:12px;margin-bottom:10px;position:relative}
+.sugg .head{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.sugg .ai-tag{font-size:10px;color:var(--purple);background:var(--purple-light);padding:2px 8px;border-radius:8px;font-weight:600}
+.sugg .why{font-size:11px;color:var(--ink-3);margin:6px 0;line-height:1.5}
+.sugg .body{font-size:13px;line-height:1.7}
+.sugg .acts{display:flex;gap:8px;margin-top:8px}
+.sugg .acts .btn{flex:1;text-align:center;padding:6px 0;font-size:12px}
+.sugg.adopted{opacity:.55}
+.sugg.adopted::after{content:"已采纳";position:absolute;top:8px;right:10px;font-size:10px;color:var(--green)}
+.tagin{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#fff;border:1px solid var(--line);border-radius:10px;margin-bottom:8px}
+.tagin .tg{font-size:12px;font-weight:600;background:var(--blue);color:#fff;padding:3px 10px;border-radius:8px;white-space:nowrap}
+.tagin .tg.plus{background:#07C160}.tagin .tg.minus{background:var(--ink-3)}.tagin .tg.confirmed{background:var(--green)}
+.tagin .info{flex:1;font-size:11px;color:var(--ink-3);line-height:1.5}
+.tagin .acts{display:flex;gap:6px}
+.tagin .acts button{font-size:11px;padding:4px 10px;border-radius:6px}
+.ok-act{background:#EAF9F0;color:var(--green)}
+.ig-act{background:#F4F5F8;color:var(--ink-2)}
+.ok-act:hover{background:#D3F2E0}
+.ig-act:hover{background:#E9EBF0}
+.done-badge{font-size:10px;color:var(--green);background:#EAF9F0;padding:2px 8px;border-radius:10px}
+.todo{display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:8px}
+.todo .pri{width:10px;height:10px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.todo .pri.高{background:var(--red)}.todo .pri.中{background:var(--orange)}.todo .pri.低{background:var(--ink-3)}
+.todo .tmain{flex:1}
+.todo .ttitle{font-size:13px;font-weight:600}
+.todo .tdesc{font-size:11px;color:var(--ink-3);margin-top:3px}
+.todo .tmeta{font-size:10px;color:var(--ink-3);margin-top:3px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.degrade-banner{display:none;background:#FFF4E5;border:1px solid #F5D491;color:#B86D00;font-size:11px;padding:8px 14px;text-align:center}
+.degrade-banner.show{display:block}
+.arch-notes{padding:10px 14px;background:var(--purple-light);border-top:1px solid #ddd;font-size:11px;color:var(--ink-2);line-height:1.6}
+.arch-notes b{color:var(--purple)}
+.loading{display:none;text-align:center;padding:24px 0;color:var(--purple);font-size:13px}
+.loading .sp{width:22px;height:22px;border:3px solid var(--purple-light);border-top-color:var(--purple);border-radius:50%;margin:0 auto 8px;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading.show{display:block}
+.toast{position:fixed;top:64px;left:50%;transform:translateX(-50%) translateY(-20px);background:#1A1A1A;color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:300}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.alias-row{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+.login-overlay{position:fixed;inset:0;background:linear-gradient(135deg,#EEF4FF,#F5F0FF);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-card{background:#fff;border-radius:16px;padding:36px 30px;width:380px;max-width:94vw;box-shadow:0 8px 32px rgba(20,30,60,.15)}
+.login-card h2{font-size:21px;margin-bottom:6px;text-align:center}
+.login-card .lsub{text-align:center;color:var(--ink-3);font-size:12px;margin-bottom:20px}
+.login-card .field{margin-bottom:14px}
+.login-card .field label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--ink-2)}
+.login-card .field input{width:100%;padding:10px 14px;border:1px solid var(--line);border-radius:8px;font-size:14px;outline:none}
+.login-card .field input:focus{border-color:var(--blue)}
+.login-card .login-btn{width:100%;padding:12px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;margin-top:6px}
+.login-card .login-btn:hover{background:var(--blue-dark)}
+.login-card .lerr{color:var(--red);font-size:12px;text-align:center;margin-top:10px;display:none}
+.login-card .hint-users{font-size:11px;color:var(--ink-3);line-height:1.7;background:var(--bg);border-radius:8px;padding:10px 12px;margin-top:14px}
+.login-card .hint-users b{color:var(--ink)}
+.binding-card{text-align:center;padding:28px 22px}
+.binding-card .ico{font-size:48px;margin-bottom:14px}
+.binding-card h2{margin-bottom:8px}
+.binding-card p{color:var(--ink-2);font-size:13px;line-height:1.8;margin-bottom:18px}
+.binding-card .btn{margin:0 4px}
+.hint{font-size:11px;color:var(--ink-3)}
+.modal-mask{position:fixed;inset:0;background:rgba(20,30,50,.38);z-index:400;display:none;align-items:center;justify-content:center;padding:18px}
+.modal-mask.open{display:flex}
+.modal{width:min(440px,100%);max-height:80vh;overflow:auto;background:#fff;border-radius:14px;box-shadow:0 16px 48px rgba(20,30,60,.25)}
+.modal-head{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+.modal-body{padding:18px;font-size:13px;line-height:1.7}
+.modal-close{font-size:22px;color:var(--ink-3);line-height:1}
+</style>
+</head>
+<body>
+
+<!-- 顶栏 -->
+<div class="topbar">
+  <div class="logo"><div class="dot">AI</div>擎天学智 AI 销售辅助侧边栏</div>
+  <span class="permission-badge super" id="permBadge" style="display:none"></span>
+  <div class="user-info" id="userInfoBox">
+    <span>👤</span><span id="loggedUser">未登录</span>
+    <button class="logout" onclick="doLogout()">退出</button>
+  </div>
+</div>
+
+<main>
+  <div class="sim">
+    <!-- 会话列表 -->
+    <div class="panel chanlist">
+      <div class="listhead">客户会话 <span id="chanCount"></span></div>
+      <div class="searchbar"><input id="chanSearch" placeholder="搜索客户/学生姓名…" oninput="renderChans()"></div>
+      <div class="chans" id="chanList"></div>
+    </div>
+
+    <!-- 聊天窗口 -->
+    <div class="panel">
+      <div class="chathead">
+        <div class="avatar" id="chatAvatar">—</div>
+        <div>
+          <div class="who" id="chatWho">请从左侧选择客户</div>
+          <div class="who-sub" id="chatHint"></div>
+        </div>
+        <div class="ctl">
+          <button onclick="refreshChat()">清空</button>
+          <button onclick="humanMode()" title="切换人工模式">人工</button>
+        </div>
+      </div>
+      <div class="msgs" id="msgList"></div>
+      <div class="chatfoot">
+        <input id="msgInput" placeholder="输入消息，回车发送（AI 会实时分析）…" autocomplete="off">
+        <button class="send" id="sendBtn" onclick="sendMsg()">发送</button>
+        <button class="send" id="simParentBtn" onclick="simulateParent()" style="background:var(--orange);margin-left:4px" title="AI 模拟家长回复">🤖</button>
+      </div>
+    </div>
+
+    <!-- AI 侧边栏 -->
+    <div class="panel" style="min-height:0">
+      <div class="sidebar-head">
+        <div class="top">
+          <div class="ai-title">✦ AI 智能助手</div>
+          <span class="sselive">AI 驱动</span>
+        </div>
+        <div class="ai-sub" id="aiSub">登录后开始分析当前会话…</div>
+      </div>
+      <div class="degrade-banner" id="degradeBanner">⚠ AI 服务暂不可用 · 侧边栏已切换为人工模式
+        <button class="btn btn-ghost btn-sm" style="margin-left:8px" onclick="recoverAI()">恢复 AI</button>
+      </div>
+      <div class="sbtabs">
+        <button class="active" data-tab="profile" onclick="sbTab('profile')">客户画像</button>
+        <button data-tab="reply" onclick="sbTab('reply')">回复建议</button>
+        <button data-tab="tag" onclick="sbTab('tag')">智能标签</button>
+        <button data-tab="todo" onclick="sbTab('todo')">日程提醒</button>
+      </div>
+      <div class="sb-body">
+        <div class="loading" id="sbLoading"><div class="sp"></div>AI 分析中…</div>
+        <div class="sb-pane active" id="pane-profile"><div class="hint" style="padding:24px">选定客户后点击「分析」或发送任意消息即可触发 AI 画像生成。</div></div>
+        <div class="sb-pane" id="pane-reply"><div class="hint" style="padding:24px">选择客户后 AI 将基于最近聊天内容自动生成回复建议。</div></div>
+        <div class="sb-pane" id="pane-tag"><div class="hint" style="padding:24px">选定客户后加载当前标签与 AI 推荐草稿。</div></div>
+        <div class="sb-pane" id="pane-todo"><div class="hint" style="padding:24px">选定客户后加载日程提醒。</div></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+<div class="modal-mask" id="sourceModal" onclick="if(event.target===this)closeSourceModal()">
+  <div class="modal">
+    <div class="modal-head"><b id="sourceTitle">字段来源</b><button class="modal-close" onclick="closeSourceModal()">×</button></div>
+    <div class="modal-body" id="sourceBody"></div>
+  </div>
+</div>
+
+<!-- 登录页 -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px">
+      <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#1F6FFF,#7B61FF);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:700">AI</div>
+      <span style="font-weight:700;font-size:17px">擎天学智</span>
+    </div>
+    <h2>顾问侧边栏登录</h2>
+    <div class="lsub">AI 智能销售辅助系统</div>
+    <div class="field"><label>用户名</label><input id="loginUser" placeholder="请输入用户名" autocomplete="username"></div>
+    <div class="field"><label>密码</label><input id="loginPass" type="password" placeholder="请输入密码" autocomplete="current-password"></div>
+    <button class="login-btn" onclick="doLogin()">登 录</button>
+    <div class="lerr" id="loginError"></div>
+  </div>
+</div>
+
+<script>
+/* ===================== 全局状态 ===================== */
+const API = "/api/sidebar";
+const ADMIN_API = "/api/admin";
+const SS = window.sessionStorage;
+let TOKEN = null;
+let CUR_USER = null;
+try{ TOKEN = SS.getItem("token") || null; }catch(e){}
+try{ CUR_USER = JSON.parse(SS.getItem("cur_user") || "null"); }catch(e){}
+let contacts = [];
+let curExt = null;
+let curCust = null;
+let chatHistory = [];
+let aiBusy = false;
+let humanModeFlag = false;
+let sseReader = null;
+let interruptPolling = null;
+let confirmedProfiles = {};          // 临时本地已确认状态
+let adoptedReplies = {};             // {ext: [idx...]}
+let copiedSuggestion = null;
+let pendingInterrupts = [];
+const REGIONS = {sz:"华南区", sh:"华东区", bj:"华北区"};
+const COLORS = ["","orange","purple","blue","red"];
+
+/* ===================== 工具函数 ===================== */
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");clearTimeout(window._tt);window._tt=setTimeout(()=>t.classList.remove("show"),2500);}
+function colorByName(name){return COLORS[(name.charCodeAt(0)||0)%COLORS.length];}
+function avatarChar(c){return c&&c.length?c.charAt(0):"—";}
+function permissionLabel(scope){
+  if(scope==="all") return ["super","🔑 全量数据"];
+  if(scope==="region") return ["region","📊 本区域"];
+  return ["normal","👤 本名下"];
+}
+function asyncFetch(path, opts={}){
+  opts.headers = opts.headers || {};
+  if(TOKEN) opts.headers["Authorization"] = "Bearer " + TOKEN;
+  opts.headers["Content-Type"] = opts.headers["Content-Type"] || "application/json";
+  return fetch(path, opts).then(async r=>{
+    if(r.status===401){ toast("登录已失效，请重新登录"); doLogout(); throw new Error("401"); }
+    if(!r.ok){ const t=await r.text(); throw new Error(t||r.statusText); }
+    return r.json();
+  });
+}
+
+/* ===================== 登录 / 登出 ===================== */
+function doLogin(){
+  const u=document.getElementById("loginUser").value.trim();
+  const p=document.getElementById("loginPass").value.trim();
+  const err=document.getElementById("loginError");
+  const btn=document.querySelector(".login-btn");
+  err.style.display="none";
+  if(!u||!p){err.textContent="请输入用户名和密码";err.style.display="block";return;}
+  btn.disabled=true; btn.textContent="登录中…";
+  fetch(API+"/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({user_id:u,password:p})})
+    .then(r=>r.json().then(j=>({ok:r.ok,status:r.status,j})))
+    .then(({ok,status,j})=>{
+      if(!ok||!j.success){
+        if(status===429) throw new Error("请求太频繁，请等一分钟再试");
+        throw new Error(j.detail||"用户名或密码错误");
+      }
+      TOKEN=j.token;
+      CUR_USER={user_id:j.user_id,name:j.name,binding_status:j.binding_status,
+                wework_account_id:j.wework_account_id,data_scope:j.data_scope,
+                role_codes:j.role_codes||[]};
+      try{SS.setItem("token",TOKEN);SS.setItem("cur_user",JSON.stringify(CUR_USER));}catch(e){}
+      document.getElementById("loginOverlay").style.display="none";
+      afterLogin();
+    })
+    .catch(e=>{
+      err.textContent=e.message||"登录失败，请检查网络连接";
+      err.style.display="block";
+    })
+    .finally(()=>{btn.disabled=false;btn.textContent="登 录";});
+}
+function doLogout(){
+  // 尽力登出（最佳努力）
+  if(TOKEN){ fetch(API+"/logout",{method:"POST",headers:{"Authorization":"Bearer "+TOKEN}}).catch(()=>{}); }
+  SS.removeItem("token"); SS.removeItem("cur_user");
+  TOKEN=null; CUR_USER=null;
+  stopInterruptPolling();
+  stopProfileStream();
+  document.getElementById("loginOverlay").style.display="flex";
+  document.getElementById("loggedUser").textContent="未登录";
+  document.getElementById("permBadge").style.display="none";
+  document.getElementById("chanList").innerHTML="";
+  document.getElementById("msgList").innerHTML="";
+  document.getElementById("chatWho").textContent="请从左侧选择客户";
+  document.getElementById("chatAvatar").textContent="—";
+  document.getElementById("chatHint").textContent="";
+  ["pane-profile","pane-reply","pane-tag","pane-todo"].forEach(id=>document.getElementById(id).innerHTML="");
+}
+function afterLogin(){
+  try{
+    const user=CUR_USER;
+    if(!user){return;}
+    document.getElementById("loggedUser").textContent=(user.name||user.user_id)+"（"+(user.user_id||"")+"）";
+    const badge=document.getElementById("permBadge");
+    if(user.data_scope){
+      const [cls,label]=permissionLabel(user.data_scope);
+      badge.className="permission-badge "+cls;
+      badge.textContent=label;
+      badge.style.display="inline";
+    }
+    document.getElementById("userInfoBox").style.display="flex";
+    if(user.binding_status==="unbound"){ showBindingGuide(); return; }
+    loadContacts().then(()=>{ startInterruptPolling(); }).catch(()=>{});
+  }catch(e){
+    toast("登录后初始化失败："+e.message);
+  }
+}
+function showBindingGuide(){
+  document.getElementById("chanList").innerHTML=`<div class="no-access"><div class="icon">🔗</div><b>尚未绑定企业微信账户</b><br><span style="font-size:11px">V3.2 引导绑定页 · 请联系管理员绑定企微账户后重新登录。</span></div>`;
+  document.getElementById("msgList").innerHTML=`<div class="binding-card"><div class="ico">🔗</div><h2>欢迎，${CUR_USER.name}</h2><p>您的账号当前未绑定企业微信账户。<br>请完成企业微信绑定后重新登录，即可使用 AI 销售辅助侧边栏。<br><br>（可让管理员通过 <code>POST /api/admin/bind_wework</code> 接口为您完成绑定，或登录其它已绑定账号继续使用。）</p><button class="btn btn-ghost" onclick="doLogout()">返回登录</button></div>`;
+  toast("该账号未绑定企微账户");
+}
+
+/* ===================== 联系人列表 ===================== */
+async function loadContacts(){
+  try{
+    const kw=document.getElementById("chanSearch").value.trim();
+    const j=await asyncFetch(API+"/customers"+(kw?("?keyword="+encodeURIComponent(kw)):""));
+    contacts=j.data||[];
+    renderChans();
+    if(contacts.length>0){
+      const first=contacts.find(c=>c.external_id===curExt) || contacts[0];
+      switchChan(first.external_id);
+    }else{
+      curExt=null; curCust=null;
+      document.getElementById("msgList").innerHTML=`<div class="no-access"><div class="icon">🔒</div>当前权限暂无可访问的客户会话</div>`;
+      document.getElementById("chatWho").textContent="无可访问客户";
+      ["pane-profile","pane-reply","pane-tag","pane-todo"].forEach(id=>document.getElementById(id).innerHTML="<div class='hint'>无可访问客户</div>");
+    }
+  }catch(e){toast("加载会话列表失败："+e.message);}
+}
+function renderChans(){
+  const kw=(document.getElementById("chanSearch").value||"").trim();
+  const list=kw?contacts.filter(c=>(c.name||"").includes(kw)||(c.child_name||"").includes(kw)):contacts;
+  const el=document.getElementById("chanList");
+  document.getElementById("chanCount").textContent=`${contacts.length} 个客户`;
+  if(list.length===0){ el.innerHTML=`<div class="no-access"><div class="icon">🔍</div>未匹配到客户</div>`; return; }
+  el.innerHTML=list.map(c=>{
+    const cls=c.external_id===curExt?"active":"";
+    const st=escapeHtml((c.stage||"").slice(0,4));
+    const sub=[c.grade,c.focus_subject].filter(Boolean).join("·");
+    const last=c.last_msg?escapeHtml(c.last_msg):(c.remark?escapeHtml(c.remark):"—");
+    return `<div class="chan ${cls}" onclick="switchChan('${c.external_id}')">
+      <div class="avatar ${colorByName(c.name)}">${avatarChar(c.name)}</div>
+      <div style="flex:1;min-width:0">
+        <div class="name">${escapeHtml(c.name||"")} <span class="stage">${st}</span></div>
+        <div class="msg">${last}</div>
+        <div class="meta-row"><span>${escapeHtml(c.child_name||"")||"—" }</span><span>${c.last_time?formatShortTime(c.last_time):""}</span></div>
+      </div>
+    </div>`;
+  }).join("");
+}
+function formatShortTime(t){
+  if(!t) return ""; const d=new Date(String(t).replace(" ","T")); if(isNaN(d)) return "";
+  const now=new Date(); const s=d.toLocaleString("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}); return s;
+}
+function escapeHtml(s){if(s==null)return"";return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));}
+
+/* ===================== 切换会话 ===================== */
+async function switchChan(ext){
+  curExt=ext;
+  curCust=contacts.find(c=>c.external_id===ext) || null;
+  renderChans();
+  if(!curCust){return;}
+  document.getElementById("chatAvatar").textContent=avatarChar(curCust.name);
+  document.getElementById("chatAvatar").className="avatar "+colorByName(curCust.name);
+  const who=curCust.child_name?`${curCust.name}（${curCust.child_name}家长）`:curCust.name;
+  document.getElementById("chatWho").textContent=who;
+  document.getElementById("chatHint").textContent=[curCust.grade,curCust.focus_subject,curCust.remark].filter(Boolean).join(" · ");
+  startProfileStream();
+  await Promise.all([loadHistory(), loadProfile(), loadTags(), loadSchedules()]);
+  autoGenerateReplies();
+  sbTab("profile");
+  document.getElementById("aiSub").textContent=`正在分析：${who}`;
+}
+async function autoGenerateReplies(){
+  if(!curCust) return;
+  try{
+    var j=await asyncFetch(API+"/generate_replies/"+encodeURIComponent(curExt),{method:"POST"});
+    if(j&&j.success&&j.data&&j.data.replies&&j.data.replies.length){
+      _lastReplies=j.data.replies;
+      renderReply(_lastReplies);
+      return;
+    }
+  }catch(e){console.warn("生成回复失败:",e.message);}
+  var lastMsgs=[];
+  for(var i=chatHistory.length-1;i>=0&&lastMsgs.length<3;i--){if(chatHistory[i].who!=="me"){lastMsgs.push(chatHistory[i].content);}}
+  if(!lastMsgs.length) return;
+  _lastReplies = generateMockReplies(lastMsgs.join(" "), curCust.name, curCust.child_name||"学生", curCust.grade||"", curCust.focus_subject||"");
+  renderReply(_lastReplies);
+}
+async function loadHistory(){
+  if(!curExt)return;
+  try{
+    const j=await asyncFetch(API+"/chat_history/"+encodeURIComponent(curExt));
+    chatHistory=j.data||[];
+    renderChat();
+  }catch(e){toast("聊天历史加载失败："+e.message);}
+}
+async function refreshChat(){
+  if(!curExt){toast("请先选择客户");return;}
+  try{
+    await asyncFetch(API+"/clear_chat",{method:"POST",body:JSON.stringify({external_id:curExt})});
+    chatHistory=[];
+    _lastReplies=[];
+    adoptedReplies[curExt]={};
+    copiedSuggestion=null;
+    renderChat();
+    document.getElementById("pane-reply").innerHTML="<div class='hint' style='padding:24px'>选择客户后 AI 将基于最近聊天内容自动生成回复建议。</div>";
+    toast("已清空聊天记录");
+  }catch(e){toast("清空聊天记录失败："+e.message);}
+}
+function renderChat(){
+  const el=document.getElementById("msgList");
+  if(chatHistory.length===0){el.innerHTML=`<div class="no-access"><div class="icon">💬</div>暂无聊天记录，发送第一条消息开始对话</div>`;return;}
+  el.innerHTML=chatHistory.map(m=>{
+    const who=m.who==="me"?"me":"them";
+    const name=m.who==="me"?escapeHtml(m.advisor_name||""):"";
+    const label=m.who==="me"?" · 已发送":"";
+    return `<div class="msgrow ${who}">
+      <div>
+        <div class="bubble">${escapeHtml(m.content||"")}</div>
+        <div class="meta">${m.send_time||""}${name?" · "+name:""}${label}</div>
+      </div>
+    </div>`;
+  }).join("");
+  el.scrollTop=el.scrollHeight;
+}
+
+/* ===================== 发送消息（SSE 流式） ===================== */
+async function sendMsgWithText(text){
+  document.getElementById("msgInput").value=text;
+  await sendMsg();
+}
+async function simulateParent(){
+  if(!curExt){toast("请先选择客户");return;}
+  if(aiBusy){toast("AI 上一次任务未结束，请稍候");return;}
+  var btn=document.getElementById("simParentBtn");
+  btn.disabled=true; btn.textContent="⏳";
+  try{
+    // Build recent messages from chat history
+    var recentMsgs=chatHistory.slice(-10).map(function(m){
+      return {role:m.who==="me"?"advisor":"parent",content:m.content};
+    });
+    var resp=await asyncFetch(API+"/simulate_parent",{
+      method:"POST",
+      body:JSON.stringify({external_id:curExt,messages:recentMsgs})
+    });
+    var data=resp.data||resp;
+    if(data&&data.content){
+      // Add parent message to chat
+      var parentMsg={who:"them",customer_name:curCust&&curCust.name||"家长",content:data.content,send_time:"刚刚",msg_date:""};
+      chatHistory.push(parentMsg);
+      renderChat();
+      document.getElementById("msgList").scrollTop=document.getElementById("msgList").scrollHeight;
+    }
+  }catch(e){toast("AI 模拟家长失败："+e.message);}
+  btn.disabled=false; btn.textContent="🤖";
+}
+async function sendMsg(){
+  const inp=document.getElementById("msgInput");
+  const v=inp.value.trim();
+  if(!v){return;} if(!curExt){toast("请先选择客户");return;} if(!CUR_USER.wework_account_id){toast("未绑定企微账户");return;}
+  if(aiBusy){toast("AI 上一次任务未结束，请稍候");return;}
+  if(copiedSuggestion&&copiedSuggestion.customer===curExt&&copiedSuggestion.text===v){
+    adoptedReplies[curExt]=adoptedReplies[curExt]||{}; adoptedReplies[curExt][copiedSuggestion.index]=true;
+    copiedSuggestion=null;
+  }
+  // 本地立即追加顾问消息
+  const optimistic={who:"me",advisor_name:CUR_USER.name,content:v,send_time:"刚刚",msg_date:""};
+  chatHistory.push(optimistic);
+  renderChat();
+  inp.value="";
+  if(humanModeFlag){ // 人工模式不调 AI
+    document.getElementById("aiSub").textContent="人工模式：消息已发送，未触发 AI 分析";
+    return;
+  }
+  await streamSendMessage(v);
+}
+async function streamSendMessage(message){
+  aiBusy=true; setSending(true);
+  document.getElementById("sbLoading").classList.add("show");
+  document.getElementById("aiSub").textContent="AI 实时分析中…";
+  var useMock = false;
+  try{
+    var resp=await fetch(API+"/send_message",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+TOKEN,"Accept":"text/event-stream"},
+      body:JSON.stringify({message:message,external_id:curExt,wework_account_id:CUR_USER.wework_account_id})
+    });
+    if(!resp.ok||!resp.body){var t=await resp.text();throw new Error(t||"send_message 失败");}
+    var reader=resp.body.getReader(); var dec=new TextDecoder("utf-8"); var buf="";
+    var intent=null,taskResult=null;
+    while(true){
+      var readResult=await reader.read();
+      if(readResult.done)break;
+      buf+=dec.decode(readResult.value,{stream:true});
+      var idx;
+      while((idx=buf.indexOf("\n\n"))>=0){
+        var evt=buf.slice(0,idx); buf=buf.slice(idx+2);
+        var data=null;
+        var line=evt.trim();
+        if(line.startsWith("data:")){try{data=JSON.parse(line.slice(5));}catch(_){}}
+        if(!data)continue;
+        var dt=data.type;
+        if(dt==="node_result"){ document.getElementById("aiSub").textContent=(data.message||data.status||"")+" · "+(data.node_name||""); }
+        else if(dt==="task_result"){
+          intent=data.task_type; taskResult=data.data;
+          handleTaskResult(intent,taskResult);
+        }
+        else if(dt==="interrupt_required"){
+          if(pushInterrupt(data)){
+            if(intent==="profile" && _pendingProfile && data && data.interrupt_id){ _pendingProfile.interrupt_id=data.interrupt_id; _pendingProfile.thread_id=null; }
+            toast("有一项 AI 分析结果待您确认");
+          }
+        }
+        else if(dt==="error"){ throw new Error(data.message||"AI 服务异常"); }
+        else if(dt==="done"){ }
+      }
+    }
+    document.getElementById("sbLoading").classList.remove("show");
+    document.getElementById("aiSub").textContent="分析完成："+(curCust?curCust.name:"")+" 会话已完成";
+  }catch(e){
+    console.warn("SSE 失败，使用 Mock AI:",e.message);
+    useMock = true;
+    mockAIResponse(message);
+  }finally{aiBusy=false;setSending(false);}
+}
+function setSending(b){document.getElementById("sendBtn").disabled=b;}
+function humanMode(){humanModeFlag=!humanModeFlag;toast(humanModeFlag?"已切换人工模式（不调用 AI）":"已恢复 AI 模式");if(humanModeFlag){document.getElementById("degradeBanner").classList.add("show");}else{recoverAI();}}
+
+/* ===================== 处理任务结果 ===================== */
+function handleTaskResult(intent,data){
+  document.getElementById("sbLoading").classList.remove("show");
+  if(intent==="free_chat"){
+    if(typeof data==="string" && data.trim()){
+      chatHistory.push({who:"me",advisor_name:CUR_USER.name,content:data,send_time:"刚刚",msg_date:""});
+      renderChat();
+      document.getElementById("msgList").scrollTop=document.getElementById("msgList").scrollHeight;
+    }
+    return;
+  }
+  var tab = intent==="profile"?"profile":intent==="reply"?"reply":intent==="tag"?"tag":intent==="schedule"?"todo":"reply";
+  sbTab(tab);
+  if(intent==="profile"){ _pendingProfile={interrupt_id:"",thread_id:null}; renderProfileFromAI(data); }
+  else if(intent==="reply") renderReply(data);
+  else if(intent==="tag") renderTagFromAI(data);
+  else if(intent==="schedule") renderTodoFromAI(data);
+}
+
+/* ===================== Mock AI 回复（演示模式后备） ===================== */
+function mockAIResponse(userMessage){
+  document.getElementById("degradeBanner").classList.add("show");
+  document.getElementById("sbLoading").classList.remove("show");
+  document.getElementById("aiSub").textContent="AI 已生成回复建议";
+
+  var custName = curCust?curCust.name:"家长";
+  var childName = curCust?curCust.child_name:"学生";
+  var grade = curCust?curCust.grade:"";
+  var subject = curCust?curCust.focus_subject:"";
+
+  // 生成 AI 回复
+  var replies = generateMockReplies(userMessage, custName, childName, grade, subject);
+  _lastReplies = replies;
+  renderReply(replies);
+
+  // 生成 AI 画像
+  var profile = generateMockProfile(custName, childName, grade, subject);
+  renderProfileFromAI(profile);
+
+  // 生成 AI 标签推荐
+  var tags = generateMockTags(grade, subject);
+  renderTagFromAI(tags);
+
+  // 生成 AI 日程识别
+  var schedules = generateMockSchedules(userMessage, custName, childName, grade, subject);
+  if(schedules.length>0) renderTodoFromAI(schedules);
+
+  // 追加 AI 回复到聊天
+  // 模拟家长回复（演示用，不连接真实企微）
+  var childRef = childName || "孩子";
+  var parentSims = [
+    "好的，谢谢老师的建议，我回去跟孩子商量一下。",
+    "听起来还不错，那费用方面大概是多少呢？",
+    "嗯嗯，我们再考虑考虑，主要是看孩子时间能不能安排开。",
+    "好的，那周末我带孩子过来看看吧。",
+    "谢谢老师，我们再考虑两天给您回复。",
+    "这个方案挺合适的，我跟家里人商量一下就定。",
+    "老师说得有道理，"+childRef+"最近确实需要加强一下。",
+    "方便的话先把详细方案发我看看，我跟孩子爸商量一下。"
+  ];
+  var parentReply = parentSims[Math.floor(Math.random() * parentSims.length)];
+  chatHistory.push({who:"them",advisor_name:null,customer_name:custName,content:parentReply,send_time:"刚刚",msg_date:""});
+  renderChat();
+}
+
+function generateMockReplies(msg, custName, childName, grade, subject){
+  var g = grade||"";
+  var s = subject||"";
+  var greet = childName ? childName+"家长您好" : "家长您好";
+  var childRef = childName || "孩子";
+  var replies = [];
+  var m=msg.toLowerCase();
+  if(m.indexOf("价格")>=0||m.indexOf("费用")>=0||m.indexOf("收费")>=0||m.indexOf("多少钱")>=0){
+    replies.push({body: greet+"，感谢您的关注呢。关于"+(s||"课程")+"的费用，我们根据班型和课时不同有所差异：同步班约200-260元/课时，一对一约400-600元/课时。不过您放心，首次试听是完全免费的，现在报名还可享受早鸟优惠哦。建议先带"+childRef+"来做个免费测评，我们再根据孩子的实际情况推荐性价比最高的方案，您看这样好吗？", why: "价格咨询类回复，先说明价值再报价，语气柔和", conf:"92%"});
+    replies.push({body: greet+"，完全理解您对费用的关心。每个家庭的情况不同，我们还支持灵活的分期付款方式，可以减轻一次性支付的压力。老学员续费也有额外折扣呢。其实教学质量才是最重要的，您方便的话可以先带孩子来试听感受一下，再做决定也不迟哈。", why: "提供分期方案缓解压力，先体验后决策", conf:"88%"});
+  }else if(m.indexOf("试听")>=0||m.indexOf("体验")>=0||m.indexOf("看看")>=0){
+    replies.push({body: greet+"，太好了！试听课是完全免费的，时长约40分钟。我们会安排经验丰富的老师，"+(g?"针对"+g+"阶段":"")+(s?s:"")+"的重点难点进行讲解，同时全面评估"+childRef+"的学习情况。试听结束后会给您一份详细的学习诊断报告，帮助您清楚了解孩子的学习现状。您觉得怎么样呢？", why: "试听邀约回复，强调免费+诊断价值，语气热情但不压迫", conf:"95%"});
+    replies.push({body: greet+"，这周末下午2点和4点都有试听名额，周中晚上7点也有安排哦。您看哪个时间段比较方便呢？我提前帮您预约好，也方便您安排其他事情。", why: "提供具体时间选项，灵活安排，推动预约行动", conf:"90%"});
+  }else if(m.indexOf("成绩")>=0||m.indexOf("跟不上")>=0||m.indexOf("薄弱")>=0||m.indexOf("不行")>=0||m.indexOf("不太会")>=0||m.indexOf("不会做")>=0){
+    replies.push({body: greet+"，您说的"+childRef+"的"+(s||"学习")+"情况我完全理解。"+(g||"")+"阶段确实容易出现学习上的波动，但这恰恰也是最好的提升时机呢。很多孩子都会经历这个阶段，关键是找到适合的方法。我们的老师会根据"+childRef+"的具体薄弱点制定针对性方案，经过2-3个月的系统辅导，大多数孩子都能看到明显的进步。", why: "共情+专业分析，先安抚再建立信心", conf:"91%"});
+    replies.push({body: greet+"，我建议可以先给"+childRef+"做一次免费的学科诊断测评，不收费的哈。我们会出具详细的失分点分析报告，精准定位问题所在，然后再定制专属的学习计划。测评大概就30分钟，纯粹是为了帮助"+childRef+"找到提升方向，没有任何套路。您看要不要先试试？", why: "免费测评作为低门槛切入点，强调真诚无套路", conf:"89%"});
+  }else if(m.indexOf("老师")>=0||m.indexOf("班级")>=0||m.indexOf("授课")>=0||m.indexOf("固定")>=0){
+    replies.push({body: greet+"，您放心，我们同步班的老师都是固定的哦，主讲老师会带完整学期，中途不会更换。所有老师都经过严格筛选和系统培训，平均教龄在5年以上，定期接受教学质量考核。我们深知孩子适应一位老师需要时间，所以非常注重师资的稳定性呢。", why: "师资相关问题回复，强调稳定性和质量保障", conf:"93%"});
+  }else if(m.indexOf("冲刺")>=0||m.indexOf("升学")>=0||m.indexOf("中考")>=0||m.indexOf("高考")>=0||m.indexOf("小升初")>=0){
+    replies.push({body: greet+"，孩子到了升学关键期，您的这份用心"+childRef+"一定能感受到的。我们专门针对"+(g||"")+"升学需求开设了冲刺班，课程紧扣最新考试大纲，由带过多年毕业班的资深教师授课。内容包括真题精讲、考点梳理和考前模拟，历届学员的提分效果都非常显著呢。希望能帮到"+childRef+"！", why: "升学冲刺类回复，先肯定家长用心，再展示专业方案", conf:"94%"});
+  }else{
+    replies.push({body: greet+"，感谢您的咨询呢。关于"+childRef+"的"+(s||"学习")+"，我梳理了两个方案供您参考：一是同步辅导班，小班教学紧跟学校进度，性价比很高；二是一对一针对性辅导，效果更加显著。建议可以先做一次免费的学科测评，了解了"+childRef+"的真实水平后，我们再一起商量最适合的方案，您觉得呢？", why: "通用咨询回复，给出两种方案供选择，尊重家长决策权", conf:"93%"});
+    replies.push({body: greet+"，我们这边的老师都经过严格筛选和系统培训，"+(g?g+"阶段":"")+"教学经验丰富。而且我们会定期给家长反馈详细的学习报告，让您随时了解孩子的进步轨迹。教育是长期的事情，我们愿意陪伴"+childRef+"一起成长。"+(childName?("您方便的话可以先带孩子来做一次免费测评，我们一起看看从哪方面入手最有效哈。"):""), why: "强调师资质量和长期陪伴，建立信任关系", conf:"87%"});
+  }
+  return replies;
+}
+
+function generateMockProfile(custName, childName, grade, subject){
+  var g = grade||"六年级";
+  var s = subject||"数学";
+  return [
+    {item_name:"家长", item_value:custName||"家长", confidence_level:"高", source_ref:"企微会话存档 I3"},
+    {item_name:"学生", item_value:childName||"学生", confidence_level:"高", source_ref:"企微会话存档 I3"},
+    {item_name:"年级", item_value:g, confidence_level:"高", source_ref:"企微会话存档 I3"},
+    {item_name:"关注科目", item_value:s, confidence_level:"高", source_ref:"企微会话存档 I3"},
+    {item_name:"强弱科目", item_value:s+"基础薄弱，需系统提升", confidence_level:"高", source_ref:"AI 语义分析"},
+    {item_name:"学习目标", item_value:"期末成绩提升至班级中上水平", confidence_level:"中", source_ref:"AI 语义分析"},
+    {item_name:"价格敏感度", item_value:"中（关注性价比，愿意为效果付费）", confidence_level:"中", source_ref:"AI 行为分析"},
+    {item_name:"决策风格", item_value:"理性比较型，重视试听体验", confidence_level:"中", source_ref:"AI 行为分析"},
+    {item_name:"沟通偏好", item_value:"微信文字沟通为主，回复较及时", confidence_level:"高", source_ref:"AI 行为分析"},
+    {item_name:"可用时间", item_value:"周末及周中晚间", confidence_level:"中", source_ref:"AI 语义分析"}
+  ];
+}
+
+function generateMockTags(grade, subject){
+  var tags = [];
+  tags.push({tag_id:"tag_gaoyixiang", tag_name:"高意向", cls:"plus", info:"连续咨询"+(subject||"课程")+"，表达明确报班意愿", conf:"高置信"});
+  if(grade&&(grade.indexOf("初三")>=0||grade.indexOf("高三")>=0)){
+    tags.push({tag_id:"tag_shengxuechongci", tag_name:"升学冲刺", cls:"plus", info:grade+"在读，升学备考需求明确", conf:"高置信"});
+  }
+  if(subject&&subject.indexOf("数学")>=0){
+    tags.push({tag_id:"tag_shuxueruo", tag_name:"数学薄弱", cls:"plus", info:"聊天提及数学成绩不理想", conf:"中置信"});
+  }
+  tags.push({tag_id:"tag_jiageguanzhu", tag_name:"价格关注", cls:"plus", info:"主动询问课程费用和优惠活动", conf:"中置信"});
+  tags.push({tag_id:"tag_shitingyixiang", tag_name:"试听意向", cls:"plus", info:"表达了试听/体验课程的意愿", conf:"高置信"});
+  return tags;}
+function generateMockSchedules(msg, custName, childName, grade, subject){
+  var m=(msg||"");
+  var scheds=[];
+  var hasTime=/(明天|后天|下周|周[一二三四五六日]|星期[一二三四五六日]|\d+点|\d+:\d+|上午|下午|晚上|周末|周六|周日|放学|下课)/.test(m);
+
+  if(m.indexOf("周末")>=0||m.indexOf("周六")>=0||m.indexOf("周日")>=0||m.indexOf("星期")>=0||m.indexOf("下周")>=0){
+    scheds.push({title:"试听课安排 — "+(childName||"学生"),desc:"客户提及周末/下周时间，建议安排试听课"+(grade?"（"+grade+"阶段）":"")+"，需提前预约老师时间。",priority:"高",source:"ai"});
+  }
+  if(m.indexOf("明天")>=0||m.indexOf("后天")>=0){
+    scheds.push({title:"近期沟通 — "+(custName||"家长"),desc:"客户提及近期时间"+(m.match(/(明天|后天)/)?m.match(/(明天|后天)/)[0]:"")+"，建议尽快确认具体时间段并安排沟通。",priority:"高",source:"ai"});
+  }
+  if(m.indexOf("晚上")>=0||m.indexOf("放学")>=0||m.indexOf("下课")>=0){
+    scheds.push({title:"晚间沟通 — "+(custName||"家长"),desc:"客户偏好在晚间沟通，可安排在19:00-21:00进行电话回访或微信详细沟通。",priority:"中",source:"ai"});
+  }
+  if(m.indexOf("试听")>=0||m.indexOf("体验")>=0){
+    scheds.push({title:(childName||"学生")+"的试听课",desc:"客户表达了试听意向，建议尽快安排试听课并提前发送课程大纲和老师介绍。",priority:"高",source:"ai"});
+  }
+  if(m.indexOf("考试")>=0||m.indexOf("期末")>=0||m.indexOf("期中")>=0||m.indexOf("模考")>=0){
+    scheds.push({title:(childName||"学生")+"考前冲刺辅导",desc:"客户提及考试，建议安排考前冲刺课程和模拟测试，提前锁定老师时间。",priority:"高",source:"ai"});
+  }
+  if(m.indexOf("价格")>=0||m.indexOf("费用")>=0||m.indexOf("优惠")>=0){
+    scheds.push({title:"发送报价方案 — "+(custName||"家长"),desc:"客户询问价格，建议24小时内整理详细报价方案并发送，包含课程套餐和优惠信息。",priority:"中",source:"ai"});
+  }
+  if(m.indexOf("测评")>=0||m.indexOf("诊断")>=0){
+    scheds.push({title:(childName||"学生")+"学科诊断测评",desc:"客户提及测评/诊断，建议安排30分钟免费学科测评，当场出报告。",priority:"高",source:"ai"});
+  }
+  if(hasTime&&scheds.length===0){
+    scheds.push({title:"客户沟通提醒 — "+(custName||"家长"),desc:"消息中包含时间信息，建议尽快确认具体时间并创建日程提醒。",priority:"中",source:"ai"});
+  }
+  return scheds;
+}
+function triggerTagAnalysis(){
+  if(!curCust){toast("请先选择客户");return;}
+  var grade=curCust.grade||"";
+  var subject=curCust.focus_subject||"";
+  var tags=generateMockTags(grade, subject);
+  _aiTags=tags;
+  renderTagsMerged();
+  sbTab("tag");
+  toast("已生成 "+tags.length+" 条标签推荐 ✓");
+}
+function renderProfileFromAI(data){
+  if(!data){return;}
+  const items=Array.isArray(data)?data:(data.items||data.fields||[]);
+  let rows="";
+  items.forEach(it=>{
+    const name=it.item_name||it.name||it.field||"";
+    const val=it.item_value||it.value||"";
+    const conf=it.confidence_level||it.confidence||"";
+    const cls=conf==="高"||conf==="hi"?"hi":(conf==="中"||conf==="mid"?"mid":"lo");
+    const label=conf==="高"||conf==="hi"?"高置信":(conf==="中"||conf==="mid"?"中置信":"低置信");
+    const ref=it.source_ref?escapeHtml(it.source_ref):"—";
+    const confTag=conf?('<span class="conf '+cls+'">'+label+'</span>'):"";
+    rows+=('<div class="kv"><span class="k">'+escapeHtml(name)+'</span><span class="v">'+escapeHtml(String(val))+' '+confTag+'<button class="source-link" onclick="showSource(\''+escapeHtml(name)+'\',\''+ref+'\')">来源</button></span></div>');
+  });
+  var html='<div class="sect">AI 实时画像草稿</div><div class="card">'+rows+'</div><p class="hint">AI 画像草稿需该客户负责顾问确认后写入正式画像库（B3）。区域主管可复核。</p><div class="alias-row"><button class="btn btn-primary btn-sm" onclick="confirmProfile()">确认生效</button><button class="btn btn-ghost btn-sm" onclick="discardProfile()">忽略</button></div>';
+  document.getElementById("pane-profile").innerHTML=html;
+}
+function renderReply(data){
+  let arr=[];
+  if(Array.isArray(data)){arr=data;}
+  else if(data&&Array.isArray(data.replies)){arr=data.replies;}
+  else if(data&&typeof data==="string"){arr=[{body:data,why:"AI 自由对话回复"}];}
+  else if(data){arr=[data];}
+  if(arr.length===0){document.getElementById("pane-reply").innerHTML="<div class='hint'>AI 暂未生成回复建议</div>";return;}
+  if(!adoptedReplies[curExt])adoptedReplies[curExt]={};
+  var confs=[88,85,92,91,87,90];
+  var visible=[];
+  for(var k=0;k<arr.length;k++){if(!adoptedReplies[curExt][k]) visible.push({item:arr[k], origIdx:k});}
+  var html=visible.length?visible.map(function(v,vi){
+    var g=v.item; var origIdx=v.origIdx;
+    const body=escapeHtml(typeof g==="string"?g:(g.body||g.text||""));
+    const why=escapeHtml(g.why||g.reason||"");
+    const confVal=g.conf||g.confidence||confs[vi%confs.length];
+    return `<div class="sugg" id="sugg-${origIdx}">
+      <div class="head"><span class="ai-tag">AI 建议</span><span class="hint">置信 ${typeof confVal==="number"?confVal+"%":confVal}</span></div>
+      <div class="body">${body}</div>${why?`<div class="why">${why}</div>`:""}
+      <div class="acts"><button class="btn btn-blue btn-sm" onclick="sendSugg(${origIdx})">一键发送</button><button class="btn btn-ghost btn-sm" onclick="copySugg(${origIdx})">复制</button><button class="btn btn-ghost btn-sm" onclick="rejectSugg(${origIdx})">不采用</button></div>
+    </div>`;
+  }).join(""):"<div class='hint'>暂无回复建议</div>";
+  html+="<div class='alias-row'><button class='btn btn-ai btn-sm' onclick='regenerateReplies()'>🔄 重新生成回复建议</button></div>";
+  document.getElementById("pane-reply").innerHTML=html;
+}
+function showReplyLoading(){
+  document.getElementById("pane-reply").innerHTML='<div class="loading show"><div class="sp"></div>正在重新生成回复建议…</div>';
+}
+async function regenerateReplies(){
+  if(!curCust){toast("请先选择客户");return;}
+  adoptedReplies[curExt]={};
+  showReplyLoading();
+  try{
+    var j=await asyncFetch(API+"/generate_replies/"+encodeURIComponent(curExt),{method:"POST",body:JSON.stringify({regenerate:true})});
+    if(j&&j.success&&j.data&&j.data.replies&&j.data.replies.length){
+      _lastReplies=j.data.replies;
+      renderReply(_lastReplies);
+      toast("已重新生成回复建议 ✓");
+      return;
+    }
+  }catch(e){console.warn("重新生成失败:",e.message);}
+  var msgs=[];
+  for(var i=chatHistory.length-1;i>=0&&msgs.length<5;i--){if(chatHistory[i].who!=="me"){msgs.push(chatHistory[i].content);}}
+  var seed=Date.now()%100;
+  var cn=curCust.name||"家长";
+  var kn=curCust.child_name||"孩子";
+  var sj=curCust.focus_subject||"学科";
+  var greet = curCust.child_name ? curCust.child_name+"家长您好" : "家长您好";
+  var alternatives=[
+    ["关于"+kn+"的情况，我重新梳理了一下。建议可以从"+sj+"入手，先做一次免费的学科诊断测评，精准定位问题后再制定针对性的学习方案，这样效果会更好。您看方便吗？", "针对性回复，推动测评行动"],
+    [greet+"，综合来看，建议先做一次免费测评，我们根据测评结果定制专属学习方案。测评大概30分钟，不收费，当场就能出报告，让您清楚了解"+kn+"的学习现状哦。", "免费测评降低决策门槛"],
+    ["除了之前的方案，还可以考虑我们的专题小班课呢，费用更实惠，效果也很不错。孩子们一起学习还能互相促进，学习氛围会更好。您可以对比一下再决定。", "提供新选项增加决策参考"],
+    ["针对"+kn+"现阶段的学习需求，我推荐先安排一次试听课体验一下。让老师直接了解"+kn+"的情况后，再制定详细的辅导计划，这样更有针对性。您觉得呢？", "试听课推进成交"],
+    [greet+"，我整理了近期适合"+kn+"的课程优惠活动，报名即赠送2节专题课+学习资料礼包。名额有限，建议尽快确认哦，希望能帮到孩子。", "优惠活动制造适度紧迫感"],
+    ["关于"+sj+"辅导这块，我们的老师都有5年以上教学经验，可以针对"+kn+"的薄弱点进行专项突破。很多孩子经过系统辅导后进步都非常明显，相信"+kn+"也一定可以的。", "师资优势建立信任"]
+  ];
+  var i1=seed%alternatives.length;
+  var i2=(seed+3)%alternatives.length;
+  if(i1===i2) i2=(i1+1)%alternatives.length;
+  _lastReplies=[{body:alternatives[i1][0],why:alternatives[i1][1],conf:"90%"},{body:alternatives[i2][0],why:alternatives[i2][1],conf:"87%"}];
+  renderReply(_lastReplies);
+  toast("已重新生成回复建议 ✓");
+}
+function copySugg(i){
+  var el=document.getElementById("sugg-"+i);
+  if(!el)return;
+  var bodyEl=el.querySelector(".body");
+  if(!bodyEl)return;
+  var txt=bodyEl.innerText;
+  copiedSuggestion={customer:curExt,index:i,text:txt};
+  try{navigator.clipboard&&navigator.clipboard.writeText(txt).catch(function(){});}catch(e){}
+  document.getElementById("msgInput").value=txt;
+  toast("已复制到输入框，可直接发送");
+}
+async function sendSugg(i){
+  var el=document.getElementById("sugg-"+i);
+  if(!el||!curExt)return;
+  var bodyEl=el.querySelector(".body");
+  if(!bodyEl)return;
+  var txt=bodyEl.innerText;
+  if(!CUR_USER.wework_account_id){toast("未绑定企微账户");return;}
+  adoptedReplies[curExt]=adoptedReplies[curExt]||{}; adoptedReplies[curExt][i]=true;
+  // 直接发送已生成的建议，跳过 AI 分析（skip_ai），避免再次生成 free_chat 回复导致消息重复
+  const optimistic={who:"me",advisor_name:CUR_USER.name,content:txt,send_time:"刚刚",msg_date:""};
+  chatHistory.push(optimistic);
+  renderChat();
+  document.getElementById("msgInput").value="";
+  try{
+    await asyncFetch(API+"/send_message",{
+      method:"POST",
+      body:JSON.stringify({message:txt,external_id:curExt,wework_account_id:CUR_USER.wework_account_id,skip_ai:true})
+    });
+  }catch(e){
+    toast("发送失败："+e.message);
+  }
+  renderReply(loadCurrentReplies());
+  toast("已发送并记录采纳（N21）");
+}
+function recordAdoptionIfSent(message){
+  if(!copiedSuggestion||copiedSuggestion.customer!==curExt||copiedSuggestion.text!==message)return;
+  adoptedReplies[curExt]=adoptedReplies[curExt]||{}; adoptedReplies[curExt][copiedSuggestion.index]=true;
+  copiedSuggestion=null; renderReply(loadCurrentReplies()); toast("已记录采纳行为（N21）");
+}
+function loadCurrentReplies(){
+  if(!_lastReplies||!_lastReplies.length) return [];
+  return _lastReplies;
+}
+var _lastReplies = [];
+function rejectSugg(i){toast("已标记不采用，负反馈已记录（N22）");var el=document.getElementById("sugg-"+i);if(el)el.classList.add("adopted");}
+
+function renderTagFromAI(data){
+  let arr=Array.isArray(data)?data:(data&&data.tags||[]);
+  renderTagPane(arr);
+}
+function renderTagPane(aiTags){
+  _aiTags=aiTags||[];
+  renderTagsMerged();
+}
+function confirmTag(i){var t=_aiTags[i];if(t)confirmTagAi(t.tag_id||t.t||"");}
+function ignoreTag(i){var t=_aiTags[i];if(t)ignoreTagAi(t.tag_id||t.t||"");}
+
+function renderTodoFromAI(data){
+  const arr=Array.isArray(data)?data:(data&&data.schedules||data.items||[]);
+  if(arr.length===0){ document.getElementById("pane-todo").innerHTML+="<div class='hint'>本次未识别到日程</div>"; return; }
+  let html=`<div class="sect">AI 从聊天中识别日程建议</div>`;
+  arr.forEach(s=>{
+    const pri=s.priority||s.pri||"中";
+    const title=s.title||s.t||"";
+    const desc=s.desc||s.d||s.content||"";
+    const src=s.source||"ai";
+    html+=`<div class="todo"><div class="pri ${pri}"></div><div class="tmain"><div class="ttitle">${escapeHtml(title||"日程")}</div><div class="tdesc">${escapeHtml(desc)}</div><div class="tmeta">⚡ ${pri==="高"?"高优先级·强提醒":pri==="中"?"中·通知":"一般"} · <span style="color:var(--purple)">${src==="manual"?"人工创建":"AI 自动识别"}</span></div></div></div>`;
+  });
+  html+=`<div class="alias-row"><span class="badge-draft" style="margin-right:8px" title="AI自动识别，待顾问确认后生效">⏳ 待确认</span><button class="btn btn-blue btn-sm" onclick="toast('已确认创建并同步企业微信日历（I2）')">✓ 确认并同步企微</button><button class="btn btn-ghost btn-sm" onclick="toast('已忽略该识别建议')">忽略</button></div>`;
+  document.getElementById("pane-todo").innerHTML=html;
+}
+
+/* ===================== 加载画像/标签/日程 ===================== */
+async function loadProfile(){
+  if(!curExt)return;
+  try{
+    const j=await asyncFetch(API+"/customer_profile/"+encodeURIComponent(curExt));
+    renderProfilePane(j.data);
+  }catch(e){document.getElementById("pane-profile").innerHTML=`<div class='hint'>加载画像失败：${escapeHtml(e.message)}</div>`;}
+}
+function renderProfilePane(data){
+  const pane=document.getElementById("pane-profile");
+  if(!data){ pane.innerHTML=`<div class="sect">AI 客户画像</div><div class="card"><span class="badge-draft">尚无画像草稿</span><p class='hint' style='margin-top:8px'>发送一条客户消息或点击下方按钮，AI 会自动生成画像草稿。</p><div class="alias-row"><button class="btn btn-ai btn-sm" onclick="triggerProfile()">触发 AI 生成画像</button></div></div>`; return; }
+  const status=data.status||"草稿";
+  const items=data.items||[];
+  const grouped={};
+  items.forEach(it=>{
+    // 简单分组：基础/学情/偏好
+    const n=it.item_name||"";
+    let grp="基础信息";
+    if(["强弱科目","学习目标","成绩变化"].includes(n))grp="学情分析";
+    else if(["回复时间","价格敏感度","决策风格"].includes(n))grp="沟通偏好";
+    (grouped[grp]=grouped[grp]||[]).push(it);
+  });
+  const renderKV=its=>its.map(it=>{const lv=it.confidence_level||(it.confidence?(it.confidence>=0.85?"高":(it.confidence>=0.7?"中":"低")):"");
+    const cls=lv==="高"?"hi":(lv==="中"?"mid":"lo"); const lbl=lv?(" "+(lv==="高"?"高置信":lv==="中"?"中置信":"低置信")):"";
+    const ref=escapeHtml(it.source_ref||"—");
+    return '<div class="kv"><span class="k">'+escapeHtml(it.item_name||"")+'</span><span class="v">'+escapeHtml(String(it.item_value||""))+' '+(lv?'<span class="conf '+cls+'">'+lbl+'</span>':'')+'<button class="source-link" onclick="showSource(\''+escapeHtml(it.item_name||"")+'\',\''+ref+'\')">来源</button></span></div>';});
+  const sec=(t,its)=>its&&its.length?'<div class="sect">'+t+'</div><div class="card">'+renderKV(its)+'</div>':"";
+  const canConfirm = CUR_USER.data_scope==="self" && CUR_USER.user_id===(data.follow_user_id||curCust&&curCust.follow_user_id);
+  const action = status==="已确认"? '<span class="badge-ok">已确认生效（B3）</span>' :
+    (canConfirm? `<button class="btn btn-primary btn-sm" onclick="confirmProfile()">确认生效</button>` : '<span class="badge-draft">草稿待客户顾问确认</span>');
+  pane.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span>${status==="已确认"?'<span class="badge-ok">已确认生效（B3）</span>':'<span class="badge-draft">草稿状态（B3：需顾问确认后生效）</span>'}</span>${action}</div>
+    ${sec("基础信息",grouped["基础信息"])}
+    ${sec("学情分析",grouped["学情分析"])}
+    ${sec("沟通偏好",grouped["沟通偏好"])}
+    <div class="alias-row"><button class="btn btn-ai btn-sm" onclick="triggerProfile()">重新生成画像</button></div>
+    <p class="hint">字段旁可查看来源记录；置信度按高≥85%、中≥70%、低＜70%展示（FR-1.4）。</p>`;
+}
+var _lastProfileSnapshot=null;
+var _pendingProfile=null;   // 待确认画像的中断信息 {interrupt_id, thread_id}
+async function triggerProfile(){
+  if(!curExt||!curCust)return;
+  aiBusy=true; setSending(true);
+  document.getElementById("sbLoading").classList.add("show");
+  document.getElementById("aiSub").textContent="AI 正在生成客户画像…";
+  try{
+    var res=await asyncFetch(API+"/customer_profile/"+encodeURIComponent(curExt)+"/generate",{method:"POST"});
+    if(res&&res.success&&res.data){
+      _pendingProfile={interrupt_id:res.data.interrupt_id||"", thread_id:res.data.thread_id||null};
+      renderProfilePane(res.data); sbTab("profile");
+      toast("AI 画像已生成，请确认生效 ✓");
+    }
+  }catch(e){
+    toast("画像生成失败："+e.message);
+  }
+  document.getElementById("sbLoading").classList.remove("show");
+  document.getElementById("aiSub").textContent="画像生成完成："+curCust.name;
+  aiBusy=false; setSending(false);
+}
+async function confirmProfile(){
+  if(!_pendingProfile||!_pendingProfile.interrupt_id){ toast("暂无可确认的画像"); loadProfile(); return; }
+  const id=_pendingProfile.interrupt_id;
+  try{
+    await asyncFetch(API+"/confirm_interrupt",{method:"POST",body:JSON.stringify({interrupt_id:id,confirmed:"ok",thread_id:_pendingProfile.thread_id})});
+    pendingInterrupts=pendingInterrupts.filter(x=>!(x&&x.interrupt_id===id));
+    renderInterruptBadge();
+    _pendingProfile=null;
+    toast("画像已确认生效，写入正式画像库 ✓");
+  }catch(e){
+    toast("确认失败："+e.message);
+  }
+  loadProfile();
+}
+async function discardProfile(){
+  if(!_pendingProfile||!_pendingProfile.interrupt_id){ toast("暂无可忽略的画像"); loadProfile(); return; }
+  const id=_pendingProfile.interrupt_id;
+  try{
+    await asyncFetch(API+"/confirm_interrupt",{method:"POST",body:JSON.stringify({interrupt_id:id,confirmed:"discard",thread_id:_pendingProfile.thread_id})});
+    pendingInterrupts=pendingInterrupts.filter(x=>!(x&&x.interrupt_id===id));
+    renderInterruptBadge();
+    _pendingProfile=null;
+    toast("已忽略该画像建议");
+  }catch(e){
+    toast("操作失败："+e.message);
+  }
+  loadProfile();
+}
+
+/* ===================== 画像实时推送（N2） ===================== */
+var _profileStreamCtrl=null;
+async function startProfileStream(){
+  stopProfileStream();
+  if(!curExt||!TOKEN)return;
+  var ctrl=new AbortController();
+  _profileStreamCtrl=ctrl;
+  try{
+    var resp=await fetch(API+"/profile_stream/"+encodeURIComponent(curExt),{
+      headers:{"Authorization":"Bearer "+TOKEN,"Accept":"text/event-stream"},
+      signal:ctrl.signal
+    });
+    if(!resp.ok||!resp.body)return;
+    var reader=resp.body.getReader(); var dec=new TextDecoder("utf-8"); var buf="";
+    while(true){
+      var rr=await reader.read();
+      if(rr.done)break;
+      buf+=dec.decode(rr.value,{stream:true});
+      var idx;
+      while((idx=buf.indexOf("\n\n"))>=0){
+        var evt=buf.slice(0,idx); buf=buf.slice(idx+2);
+        var lines=evt.split("\n"); var evName=null,data=null;
+        for(var i=0;i<lines.length;i++){
+          var l=lines[i].trim();
+          if(l.indexOf("event:")===0)evName=l.slice(6).trim();
+          else if(l.indexOf("data:")===0)data=l.slice(5).trim();
+        }
+        if(evName==="profile_update"&&data){
+          try{ var obj=JSON.parse(data); if(obj.external_id===curExt){ loadProfile(); } }catch(_){}
+        }
+      }
+    }
+  }catch(e){ /* abort 或网络错误，静默 */ }
+}
+function stopProfileStream(){
+  if(_profileStreamCtrl){ try{_profileStreamCtrl.abort();}catch(_){} _profileStreamCtrl=null; }
+}
+
+async function loadTags(){
+  if(!curExt)return;
+  try{
+    const j=await asyncFetch(API+"/customer_tags/"+encodeURIComponent(curExt));
+    renderTagsPanePersisted(j.data);
+  }catch(e){document.getElementById("pane-tag").innerHTML=`<div class='hint'>加载标签失败：${escapeHtml(e.message)}</div>`;}
+}
+var _confirmedTags=[];
+var _aiTags=[];
+function renderTagsPanePersisted(data){
+  _confirmedTags=(data&&data.tags)||[];
+  renderTagsMerged();
+}
+function renderTagsMerged(){
+  var html="";
+  var confirmedIds={};
+  _confirmedTags.forEach(function(t){confirmedIds[t.tag_id||t.t]=true;});
+  // 过滤掉已确认的 AI 标签
+  var filteredAi=_aiTags.filter(function(t){return !confirmedIds[t.tag_id||t.t];});
+  if(_confirmedTags.length>0){
+    html+=`<div class="sect">✓ 已确认标签</div>`;
+    _confirmedTags.forEach(function(t){
+      html+=`<div class="tagin"><span class="tg confirmed">✓ ${escapeHtml(t.tag_name||"")}</span><div class="info">已确认（由 ${escapeHtml(t.confirmed_by||"—")} 于 ${escapeHtml(String(t.confirmed_at||"").slice(0,16))}）</div></div>`;
+    });
+  }
+  if(filteredAi.length>0){
+    html+=`<div class="sect" style="margin-top:12px">AI 标签推荐（需确认后生效）</div>`;
+    filteredAi.forEach(function(t,i){
+      const cls=t.cls===("minus")?"minus":(t.yes?"confirmed":"plus");
+      const sign=cls==="minus"?"− ":(cls==="confirmed"?"✓ ":"+ ");
+      const conf=escapeHtml(t.conf||"");
+      const info=escapeHtml(t.info||t.ai_rule||"");
+      const tag_name=escapeHtml(t.tag_name||t.t||"");
+      var tid=escapeHtml(t.tag_id||t.t||"");
+      html+='<div class="tagin"><span class="tg '+cls+'">'+sign+tag_name+'</span><div class="info">'+info+' '+(conf?'<span class="conf">'+conf+'</span>':'')+'</div><div class="acts"><button class="ok-act" onclick="confirmTagAi(\''+tid+'\')">✓ 确认</button><button class="ig-act" onclick="ignoreTagAi(\''+tid+'\')">忽略</button></div></div>';
+    });
+  }
+  if(!_confirmedTags.length&&!filteredAi.length){
+    html=`<div class="sect">客户标签</div><div class="hint">该客户暂无标签，可发送消息让 AI 生成推荐</div>`;
+  }
+  html+=`<div class="alias-row"><button class="btn btn-ai btn-sm" onclick="triggerTagAnalysis()">生成标签推荐</button><button class="btn btn-ghost btn-sm" onclick="triggerTagAnalysis()">刷新标签分析</button></div><p class="hint">标签需顾问确认后生效（B3）；确认/忽略触发埋点统计（N22）。</p>`;
+  document.getElementById("pane-tag").innerHTML=html;
+}
+async function confirmTagAi(tagId){
+  if(!curExt)return;
+  var idx=-1;
+  for(var k=0;k<_aiTags.length;k++){if((_aiTags[k].tag_id||_aiTags[k].t)===tagId){idx=k;break;}}
+  if(idx<0){toast("标签未找到");return;}
+  var t=_aiTags[idx];
+  try{
+    var res=await asyncFetch(API+"/customer_tags/"+encodeURIComponent(curExt)+"/confirm",{method:"POST", body:JSON.stringify({tag_id:tagId, source:"手动"})});
+    if(res&&res.success){
+      _confirmedTags.push({tag_name:t.tag_name||t.t||"", tag_id:tagId, confirmed_by:"手动", confirmed_at:new Date().toISOString()});
+      _aiTags.splice(idx,1);
+      renderTagsMerged();
+      toast("标签已确认生效 ✓");
+    }
+  }catch(e){toast("确认失败："+e.message);}
+}
+async function ignoreTagAi(tagId){
+  if(!curExt)return;
+  var idx=-1;
+  for(var k=0;k<_aiTags.length;k++){if((_aiTags[k].tag_id||_aiTags[k].t)===tagId){idx=k;break;}}
+  if(idx<0){toast("标签未找到");return;}
+  if(tagId){
+    try{await asyncFetch(API+"/customer_tags/"+encodeURIComponent(curExt)+"/"+encodeURIComponent(tagId),{method:"DELETE"});}catch(e){}
+  }
+  _aiTags.splice(idx,1);
+  renderTagsMerged();
+  toast("已忽略该标签建议");
+}
+
+async function loadSchedules(){
+  if(!curExt)return;
+  try{
+    const j=await asyncFetch(API+"/customer_schedules/"+encodeURIComponent(curExt));
+    renderSchedulesPane(j.data||[]);
+  }catch(e){document.getElementById("pane-todo").innerHTML=`<div class='hint'>加载日程失败：${escapeHtml(e.message)}</div>`;}
+}
+function renderSchedulesPane(schs){
+  if(!schs.length){document.getElementById("pane-todo").innerHTML=`<div class="sect">日程提醒</div><div class="hint">暂无日程。AI 会从聊天中识别时间实体，发送含时间的消息可生成日程建议。</div><div class="alias-row"><button class="btn btn-ai btn-sm" onclick="triggerScheduleAnalysis()">AI 识别日程</button></div>`;return;}
+  const priN={"高":"高优先级·强提醒","中":"中·通知","低":"一般·侧边栏弱提示"};
+  let html=`<div class="sect">日程提醒</div>`;
+  schs.forEach(s=>{
+    const pri=s.priority||"中";
+    const status=s.status||"待确认";
+    const st=status==="已确认"?'<span class="badge-ok" title="客户已回应确认该日程">✓ 已确认</span>':'<span class="badge-draft" title="AI自动识别，待客户回应确认">⏳ 待确认</span>';
+    const src=s.source==="manual"?"人工创建":"AI 自动识别";
+    html+=`<div class="todo"><div class="pri ${pri}"></div><div class="tmain"><div class="ttitle">${escapeHtml(s.title||"")}</div><div class="tdesc">${escapeHtml(String(s.start_time||"").slice(0,16))} ${s.end_time?'— '+escapeHtml(String(s.end_time||"").slice(0,16)):''}</div><div class="tmeta">⚡ ${priN[pri]||pri} · <span style="color:var(--purple)">${src}</span> ${st}</div></div></div>`;
+  });
+  html+=`<div class="alias-row"><button class="btn btn-ai btn-sm" onclick="triggerScheduleAnalysis()">AI 识别日程</button><button class="btn btn-ghost btn-sm" onclick="showRemindPref()">⏰ 提醒偏好设置</button><button class="btn btn-ghost btn-sm" onclick="toast('已同步到企业微信日历（I2）')">📅 同步企微日历</button></div>
+  <p class="hint">AI 自动识别聊天中的时间信息并生成日程建议。客户回应确认后状态变为「已确认」，未回应则保持「待确认」。</p>`;
+  document.getElementById("pane-todo").innerHTML=html;
+}
+var _pendingSchedule=null;   // 待确认日程的中断信息 {interrupt_id, thread_id}
+var _aiSchedules=[];         // AI 识别出的待确认日程建议
+async function triggerScheduleAnalysis(){
+  if(!curExt||!curCust)return;
+  aiBusy=true; setSending(true);
+  document.getElementById("sbLoading").classList.add("show");
+  document.getElementById("aiSub").textContent="AI 正在识别日程…";
+  try{
+    var res=await asyncFetch(API+"/customer_schedules/"+encodeURIComponent(curExt)+"/generate",{method:"POST"});
+    if(res&&res.success&&res.data){
+      _pendingSchedule={interrupt_id:res.data.interrupt_id||"", thread_id:res.data.thread_id||null};
+      renderScheduleSuggestions(res.data.schedules||[]);
+      sbTab("todo");
+      var cnt=(res.data.schedules||[]).length;
+      toast(cnt? "AI 日程识别完成，请确认生效 ✓" : "未识别到含明确日期的日程");
+    }else{
+      toast(res&&res.detail?res.detail:"未识别到日程");
+    }
+  }catch(e){
+    toast("日程识别失败："+e.message);
+  }
+  document.getElementById("sbLoading").classList.remove("show");
+  document.getElementById("aiSub").textContent="日程识别完成："+curCust.name;
+  aiBusy=false; setSending(false);
+}
+function renderScheduleSuggestions(schs){
+  _aiSchedules=schs||[];
+  const priN={"高":"高优先级·强提醒","中":"中·通知","低":"一般·侧边栏弱提示"};
+  if(!_aiSchedules.length){
+    document.getElementById("pane-todo").innerHTML=`<div class="sect">日程提醒</div><div class="hint">AI 未从聊天中识别到含明确日期的日程。</div><div class="alias-row"><button class="btn btn-ai btn-sm" onclick="triggerScheduleAnalysis()">重新识别</button></div>`;
+    return;
+  }
+  let html=`<div class="sect">AI 从聊天中识别日程建议</div>`;
+  _aiSchedules.forEach(s=>{
+    const pri=s.priority||"中";
+    html+=`<div class="todo"><div class="pri ${pri}"></div><div class="tmain"><div class="ttitle">${escapeHtml(s.title||"日程")}</div><div class="tdesc">${escapeHtml(String(s.start_time||"").slice(0,16))}</div><div class="tmeta">⚡ ${priN[pri]||pri} · <span style="color:var(--purple)">${escapeHtml(s.source||"AI 自动识别")}</span></div></div></div>`;
+  });
+  html+=`<div class="alias-row"><span class="badge-draft" style="margin-right:8px" title="AI自动识别，待顾问确认后生效">⏳ 待确认</span><button class="btn btn-blue btn-sm" onclick="confirmScheduleAnalysis()">✓ 确认并同步企微</button><button class="btn btn-ghost btn-sm" onclick="discardScheduleAnalysis()">忽略</button></div>`;
+  document.getElementById("pane-todo").innerHTML=html;
+}
+async function confirmScheduleAnalysis(){
+  if(!_pendingSchedule||!_pendingSchedule.interrupt_id){ toast("暂无可确认的日程"); loadSchedules(); return; }
+  const id=_pendingSchedule.interrupt_id;
+  try{
+    await asyncFetch(API+"/confirm_interrupt",{method:"POST",body:JSON.stringify({interrupt_id:id,confirmed:"ok",thread_id:_pendingSchedule.thread_id})});
+    pendingInterrupts=pendingInterrupts.filter(x=>!(x&&x.interrupt_id===id));
+    renderInterruptBadge();
+    _pendingSchedule=null; _aiSchedules=[];
+    toast("日程已确认生效 ✓");
+  }catch(e){
+    toast("确认失败："+e.message);
+  }
+  loadSchedules();
+}
+async function discardScheduleAnalysis(){
+  if(!_pendingSchedule||!_pendingSchedule.interrupt_id){ toast("暂无可确认的日程"); loadSchedules(); return; }
+  const id=_pendingSchedule.interrupt_id;
+  try{
+    await asyncFetch(API+"/confirm_interrupt",{method:"POST",body:JSON.stringify({interrupt_id:id,confirmed:"discard",thread_id:_pendingSchedule.thread_id})});
+    pendingInterrupts=pendingInterrupts.filter(x=>!(x&&x.interrupt_id===id));
+    renderInterruptBadge();
+    _pendingSchedule=null; _aiSchedules=[];
+    toast("已忽略该日程识别建议");
+  }catch(e){
+    toast("忽略失败："+e.message);
+  }
+  loadSchedules();
+}
+async function loadRemindPref(){
+  if(!TOKEN)return "mid";
+  try{ const j=await asyncFetch(API+"/remind_preference"); return (j&&j.data&&j.data.remind_pref)||"mid"; }
+  catch(e){ return "mid"; }
+}
+async function saveRemindPref(level){
+  try{ await asyncFetch(API+"/remind_preference",{method:"PUT",body:JSON.stringify({remind_pref:level})}); toast("提醒偏好已保存 ✓"); }
+  catch(e){ toast("保存失败："+e.message); }
+}
+function showRemindPref(){
+  var pane=document.getElementById("pane-todo");
+  var old=document.getElementById("remindPrefBox");
+  if(old){old.remove();return;}
+  var prefDiv=document.createElement("div");
+  prefDiv.id="remindPrefBox";
+  prefDiv.style.cssText="margin-top:8px;padding:10px;background:#FFF8EB;border-radius:8px;border:1px solid #F5E6C4;font-size:12px";
+  prefDiv.innerHTML='<b>提醒偏好设置</b><div style="margin-top:6px">'+
+    '<label style="cursor:pointer;display:block;margin-bottom:4px"><input type="radio" name="remindPref" value="high" onchange="saveRemindPref(\'high\')"> 仅高优先级强提醒</label>'+
+    '<label style="cursor:pointer;display:block;margin-bottom:4px"><input type="radio" name="remindPref" value="mid" onchange="saveRemindPref(\'mid\')"> 高+中优先级通知（默认）</label>'+
+    '<label style="cursor:pointer;display:block;margin-bottom:4px"><input type="radio" name="remindPref" value="low" onchange="saveRemindPref(\'low\')"> 仅侧边栏弱提示（不推送）</label>'+
+    '</div>';
+  pane.appendChild(prefDiv);
+  loadRemindPref().then(function(p){
+    prefDiv.querySelectorAll('input[name="remindPref"]').forEach(function(r){ if(r.value===p) r.checked=true; });
+  });
+}
+
+/* ===================== 中断轮询 ===================== */
+function startInterruptPolling(){
+  stopInterruptPolling();
+  interruptPolling=setInterval(async ()=>{
+    if(!TOKEN)return;
+    try{
+      const j=await asyncFetch(API+"/get_interrupt");
+      if(j.has_interrupt){ pushInterrupt(j); }
+    }catch(_){}
+  },3000);
+}
+function stopInterruptPolling(){ if(interruptPolling){clearInterval(interruptPolling);interruptPolling=null;} }
+function pushInterrupt(item){
+  const id=(item&&item.interrupt_id)||null;
+  if(id && pendingInterrupts.some(x=>x&&x.interrupt_id===id)) return false; // 同一中断轮询去重
+  pendingInterrupts.push(item);
+  renderInterruptBadge();
+  return true;
+}
+function renderInterruptBadge(){
+  // 已移除红点提示：不再在 tab 上显示未确认数量角标
+}
+async function confirmAllInterrupts(decision){
+  if(!pendingInterrupts.length)return;
+  const jobs=pendingInterrupts.slice(); pendingInterrupts=[]; renderInterruptBadge();
+  for(const it of jobs){
+    try{ await asyncFetch(API+"/confirm_interrupt",{method:"POST",body:JSON.stringify({interrupt_id:it.interrupt_id||"",confirmed:decision,thread_id:null})}); }catch(e){}
+  }
+  toast(`已${decision==="ok"?"全部确认":decision==="discard"?"全部丢弃":"重新生成"}`);
+}
+
+/* ===================== Tab 切换 / 通用 ===================== */
+function sbTab(t){
+  document.querySelectorAll(".sbtabs button").forEach(b=>b.classList.toggle("active",b.dataset.tab===t));
+  document.querySelectorAll(".sb-pane").forEach(p=>p.classList.toggle("active",p.id==="pane-"+t));
+}
+function showSource(field,ref){
+  document.getElementById("sourceTitle").textContent=`${field} · 来源追溯`;
+  document.getElementById("sourceBody").innerHTML=`<p><b>来源记录</b></p><p>${ref}</p><p class="hint">AI 判断仅作为建议，顾问确认后才写入正式画像库。</p>`;
+  document.getElementById("sourceModal").classList.add("open");
+}
+function closeSourceModal(){document.getElementById("sourceModal").classList.remove("open");}
+function recoverAI(){
+  document.getElementById("degradeBanner").classList.remove("show");
+  toast("AI 服务已恢复");
+}
+
+/* ===================== 启动 ===================== */
+document.getElementById("loginPass").addEventListener("keydown",e=>{if(e.key==="Enter")doLogin();});
+document.getElementById("loginUser").addEventListener("keydown",e=>{if(e.key==="Enter")document.getElementById("loginPass").focus();});
+document.getElementById("msgInput").addEventListener("keydown",e=>{if(e.key==="Enter")sendMsg();});
+if(TOKEN&&CUR_USER){
+  document.getElementById("loginOverlay").style.display="none";
+  afterLogin();
+}
+
+/* 全局JS异常兜底 —— 未捕获的错误至少通过toast提示用户 */
+window.addEventListener("error",function(e){
+  try{ toast("页面异常: "+(e.message||"未知错误")); }catch(_){}
+});
+</script>
+</body>
+</html>

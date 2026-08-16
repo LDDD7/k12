@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>擎天学智 K12 用户画像推荐系统</title>
+<style>
+  :root{
+    --blue:#1F6FFF; --blue-dark:#1557d8; --purple:#7B61FF;
+    --ink:#1A1A1A; --ink-2:#5B6472; --ink-3:#9AA3B2;
+    --line:#E9ECF2; --bg:#F5F7FA; --card:#FFFFFF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;background:linear-gradient(135deg,#EEF4FF,#F5F0FF);color:var(--ink);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .wrap{max-width:880px;width:100%;text-align:center}
+  .logo{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:8px}
+  .logo .dot{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#1F6FFF,#7B61FF);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:700;box-shadow:0 8px 24px rgba(31,111,255,.3)}
+  .logo h1{font-size:24px;font-weight:700}
+  .sub{color:var(--ink-2);font-size:14px;margin-bottom:36px}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:640px){.cards{grid-template-columns:1fr}}
+  .card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:28px 24px;text-decoration:none;color:var(--ink);box-shadow:0 4px 16px rgba(20,30,60,.05);transition:.2s;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+  .card:hover{transform:translateY(-3px);box-shadow:0 10px 28px rgba(31,111,255,.18);border-color:var(--blue)}
+  .card .ico{width:54px;height:54px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px}
+  .card .ico.sidebar{background:linear-gradient(135deg,#1F6FFF,#7B61FF);color:#fff}
+  .card .ico.admin{background:linear-gradient(135deg,#FF9F0A,#FA5151);color:#fff}
+  .card h2{font-size:18px;font-weight:700}
+  .card p{font-size:13px;color:var(--ink-2);line-height:1.7;text-align:left}
+  .card .cta{margin-top:auto;color:var(--blue);font-size:13px;font-weight:600}
+  .desc{margin-top:28px;background:#fff;border-radius:14px;padding:18px 22px;text-align:left;font-size:13px;color:var(--ink-2);line-height:1.8;border:1px solid var(--line)}
+  .desc b{color:var(--ink)}
+  code{background:#EEF4FF;padding:2px 6px;border-radius:6px;font-size:12px;color:var(--blue)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">
+    <div class="dot">AI</div>
+    <h1>擎天学智 K12 用户画像推荐系统</h1>
+  </div>
+  <div class="sub">AI 智能销售辅助系统</div>
+  <div class="cards">
+    <a class="card" href="/sidebar">
+      <div class="ico sidebar">💬</div>
+      <h2>顾问侧边栏</h2>
+      <p>360px 企微侧边栏前端：客户会话列表 · 聊天窗口 · AI 客户画像 / 回复建议 / 智能标签 / 日程提醒 · SSE 流式推送 · 中断确认。顾问视角，按权限过滤会话。</p>
+      <span class="cta">进入 →</span>
+    </a>
+    <a class="card" href="/admin">
+      <div class="ico admin">📊</div>
+      <h2>管理后台</h2>
+      <p>管理后台前端：数据看板 · 员工 / 客户 / 订单 / 标签 / 跟进 / 权限管理。三级角色权限隔离（超级管理员 · 区域主管 · 普通顾问）。</p>
+      <span class="cta">进入 →</span>
+    </a>
+  </div>
+</div>
+</body>
+</html>

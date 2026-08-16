@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>擎天学智 管理后台</title>
+<style>
+:root{
+  --blue:#1F6FFF; --blue-dark:#1557d8;
+  --purple:#7B61FF; --purple-light:#F0ECFF;
+  --red:#FA5151; --orange:#FF9F0A; --green:#07C160;
+  --ink:#1A1A1A; --ink-2:#5B6472; --ink-3:#9AA3B2;
+  --line:#E9ECF2; --bg:#F5F7FA; --card:#FFFFFF;
+  --radius:12px; --shadow:0 2px 10px rgba(20,30,60,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+input,select,textarea{font-family:inherit}
+.topbar{position:sticky;top:0;height:56px;background:linear-gradient(90deg,#fff 0%,#F7FAFF 100%);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 22px;gap:14px;z-index:50;box-shadow:0 1px 6px rgba(20,30,60,.04)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;letter-spacing:.2px}
+.logo .dot{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#1F6FFF,#7B61FF);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;box-shadow:0 3px 8px rgba(31,111,255,.28)}
+.user-info{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--ink-2);background:var(--bg);padding:5px 12px;border-radius:20px}
+.user-info .logout{font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid var(--red);color:var(--red);background:#fff;transition:.15s}
+.user-info .logout:hover{background:var(--red);color:#fff}
+.permission-badge{font-size:10px;padding:2px 8px;border-radius:10px;white-space:nowrap}
+.permission-badge.super{background:#FDEBEB;color:var(--red)}
+.permission-badge.region{background:#FFF4E5;color:var(--orange)}
+.permission-badge.normal{background:#EEF4FF;color:var(--blue)}
+main{max-width:1360px;margin:0 auto;padding:16px 22px 44px}
+.admin{display:grid;grid-template-columns:208px 1fr;gap:14px;min-height:calc(100vh - 116px)}
+@media(max-width:900px){.admin{grid-template-columns:1fr}.anav{flex-direction:row;overflow:auto;padding:8px}.anav .aitem{white-space:nowrap}.acontent{padding:14px}}
+.anav{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:12px 8px;display:flex;flex-direction:column;gap:4px;height:fit-content;position:sticky;top:70px}
+.anav .aitem{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--ink-2);font-size:13px;cursor:pointer;transition:.15s;border:1px solid transparent}
+.anav .aitem:hover{background:var(--bg);color:var(--ink)}
+.anav .aitem.active{background:#EEF4FF;color:var(--blue);font-weight:600;border-color:#D8E6FF}
+.anav .aitem .ico{font-size:15px}
+.acontent{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:22px;overflow:auto;min-height:540px}
+.acontent h2{font-size:19px;margin-bottom:4px}
+.acontent .sub{color:var(--ink-3);font-size:12px;margin-bottom:16px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+@media(max-width:760px){.kpis{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr!important}}
+.kpi{background:var(--bg);border-radius:10px;padding:14px;border:1px solid transparent;transition:.15s}
+.kpi:hover{border-color:var(--line);box-shadow:var(--shadow)}
+.kpi .l{font-size:12px;color:var(--ink-2);display:flex;align-items:center;gap:6px}
+.kpi .v{font-size:22px;font-weight:700;margin-top:4px}
+.kpi .d{font-size:11px;margin-top:4px}
+.kpi .d.up{color:var(--green)}.kpi .d.down{color:var(--red)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.box{background:var(--bg);border-radius:10px;padding:14px}
+.box h3{font-size:13px;margin-bottom:12px}
+.funnel{display:flex;flex-direction:column;align-items:center;padding:6px 0 2px}
+.funnel .fstep{display:flex;flex-direction:column;align-items:center;width:100%;margin-bottom:2px}
+.funnel .fshape{height:48px;display:flex;align-items:center;justify-content:center;gap:10px;color:#fff;font-weight:600;clip-path:polygon(0 0,100% 0,calc(100% - 18px) 100%,18px 100%);filter:drop-shadow(0 3px 6px rgba(20,30,60,.16))}
+.funnel .fname{font-size:13px;font-weight:600;letter-spacing:.5px}
+.funnel .fcnt{font-size:17px;font-weight:700}
+.funnel .funit{font-size:11px;font-weight:400;opacity:.85;margin-left:2px}
+.funnel .fconv{font-size:11px;color:var(--ink-2);background:var(--bg);border:1px solid var(--line);padding:2px 10px;border-radius:10px;margin:6px 0;line-height:1.4}
+.donut-wrap{display:flex;align-items:center;gap:16px}
+.donut{width:150px;height:150px;flex-shrink:0}
+.dcnt{font-size:26px;font-weight:700;fill:var(--ink);text-anchor:middle}
+.dlbl{font-size:11px;fill:var(--ink-2);text-anchor:middle}
+.dlegend{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0}
+.dleg{display:flex;align-items:center;gap:8px;font-size:12px}
+.dleg .dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.dleg .dlb{flex:1;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dleg .dlv{color:var(--ink);font-weight:700}
+.dleg .dlp{color:var(--ink-3);width:38px;text-align:right}
+table.tbl{width:100%;border-collapse:collapse;font-size:12px;background:#fff}
+table.tbl th{background:var(--bg);color:var(--ink-2);text-align:left;padding:10px 12px;font-weight:600;position:sticky;top:0;border-bottom:1px solid var(--line);white-space:nowrap}
+table.tbl td{padding:10px 12px;border-bottom:1px solid #F0F2F6;vertical-align:middle}
+table.tbl tr:hover td{background:#FAFBFF}
+table.tbl tr:last-child td{border-bottom:none}
+.status{font-size:11px;padding:2px 8px;border-radius:8px;white-space:nowrap}
+.status.s-ok{background:#EAF9F0;color:var(--green)}
+.status.s-wait{background:#FFF4E5;color:var(--orange)}
+.status.s-off{background:#F0F0F5;color:var(--ink-3)}
+.status.s-ai{background:var(--purple-light);color:var(--purple)}
+.progressbar{height:6px;background:#EEF1F6;border-radius:3px;overflow:hidden;min-width:70px;display:inline-block;vertical-align:middle;margin-right:6px}
+.progressbar i{display:block;height:100%;background:var(--blue);border-radius:3px}
+.filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.filters select,.filters input{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;outline:none;background:#fff;transition:border-color .15s, box-shadow .15s}
+.filters input:focus,.filters select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(31,111,255,.12)}
+.filters .btn-blue{padding:8px 14px;font-size:12px}
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap}
+.pagebar{display:flex;justify-content:flex-end;gap:4px;margin-top:14px;align-items:center}
+.pagebar button{min-width:28px;height:28px;border-radius:6px;border:1px solid var(--line);font-size:12px;color:var(--ink-2);padding:0 6px;background:#fff;transition:.15s}
+.pagebar button:hover{border-color:var(--blue);color:var(--blue)}
+.pagebar button.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.btn{display:inline-block;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;transition:.15s}
+.btn-blue{background:var(--blue);color:#fff;box-shadow:0 2px 6px rgba(31,111,255,.25)}.btn-blue:hover{background:var(--blue-dark)}
+.btn-ghost{border:1px solid var(--line);color:var(--ink-2);background:#fff}.btn-ghost:hover{border-color:var(--blue);color:var(--blue);background:#F7FAFF}
+.btn-sm{padding:5px 10px;font-size:12px;border-radius:6px}
+.toast{position:fixed;top:64px;left:50%;transform:translateX(-50%) translateY(-20px);background:#1A1A1A;color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:300}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.permnote{font-size:11px;color:var(--ink-3);background:#FFF8EB;border:1px solid #F5E6C4;border-radius:8px;padding:8px 12px;margin-bottom:14px}
+.hint{font-size:11px;color:var(--ink-3)}
+.tip{display:inline-block;width:15px;height:15px;line-height:15px;text-align:center;border-radius:50%;background:var(--bg);border:1px solid var(--line);color:var(--ink-3);font-size:11px;font-style:normal;cursor:help;margin-left:6px;position:relative;vertical-align:middle}
+.tip:hover::after{content:attr(data-tip);position:absolute;left:50%;transform:translateX(-50%);top:130%;width:max-content;max-width:240px;background:#1A1A1A;color:#fff;padding:7px 10px;border-radius:6px;font-size:11px;font-weight:400;line-height:1.5;white-space:normal;text-align:left;z-index:200;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.badge-stage{font-size:10px;padding:2px 8px;border-radius:8px;background:#EEF4FF;color:var(--blue)}
+.permmatrix{font-size:12px;border-collapse:collapse}
+.permmatrix td,.permmatrix th{border:1px solid var(--line);padding:8px 10px;text-align:center}
+.permmatrix th{background:var(--bg)}
+.permmatrix .yes{color:var(--green);font-weight:700}
+.permmatrix .no{color:var(--ink-3)}
+.drawer{position:fixed;top:52px;right:0;bottom:0;width:540px;background:#fff;box-shadow:-4px 0 20px rgba(0,0,0,.12);z-index:200;transform:translateX(110%);transition:transform .25s ease;display:flex;flex-direction:column}
+@media(max-width:700px){.drawer{width:100%;top:0}}
+.drawer.open{transform:none}
+.drawer .dhead{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+.drawer .dhead b{font-size:15px}
+.drawer .dbody{flex:1;overflow:auto;padding:16px 20px}
+.drawer .dsec{margin-bottom:18px}
+.drawer .dsec-title{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--ink-2);margin-bottom:10px;letter-spacing:.3px}
+.drawer .dsec-title::after{content:"";flex:1;height:1px;background:var(--line)}
+.drawer .dsec-title .fico{font-size:13px}
+.kv-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;background:var(--bg);border-radius:10px;padding:10px 14px}
+.kv{display:flex;justify-content:space-between;padding:6px 0;font-size:12px;gap:10px}
+.kv .k{color:var(--ink-3);flex-shrink:0}
+.kv .v{color:var(--ink);font-weight:500;text-align:right;word-break:break-all}
+.timeline{border-left:2px solid var(--line);padding-left:14px}
+.tl-item{position:relative;margin-bottom:14px}
+.tl-item::before{content:"";position:absolute;left:-19px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--blue)}
+.tl-item .tl-t{font-size:11px;color:var(--ink-3)}
+.tl-item .tl-c{font-size:12px;margin-top:2px;line-height:1.6}
+.tl-item .aiflag{font-size:10px;color:var(--purple);background:var(--purple-light);padding:0 6px;border-radius:6px;margin-left:4px}
+.login-overlay{position:fixed;inset:0;background:linear-gradient(135deg,#EEF4FF 0%,#F5F0FF 50%,#F0FAFF 100%);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-card{background:#fff;border-radius:18px;padding:40px 34px;width:420px;max-width:94vw;box-shadow:0 12px 40px rgba(20,30,60,.16);border:1px solid #EEF1F8}
+.login-card h2{font-size:21px;margin-bottom:6px;text-align:center}
+.login-card .lsub{text-align:center;color:var(--ink-3);font-size:12px;margin-bottom:22px}
+.login-card .field{margin-bottom:14px}
+.login-card .field label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--ink-2)}
+.login-card .field input{width:100%;padding:11px 14px;border:1px solid var(--line);border-radius:10px;font-size:14px;outline:none;transition:border-color .15s, box-shadow .15s;background:#FAFBFF}
+.login-card .field input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(31,111,255,.12);background:#fff}
+.login-card .login-btn{width:100%;padding:12px;background:linear-gradient(135deg,#1F6FFF,#4A8BFF);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;margin-top:6px;box-shadow:0 4px 12px rgba(31,111,255,.3);transition:.15s}
+.login-card .login-btn:hover{background:linear-gradient(135deg,#1557d8,#1F6FFF)}
+.login-card .lerr{color:var(--red);font-size:12px;text-align:center;margin-top:10px;display:none}
+.login-card .hint-users{font-size:11px;color:var(--ink-3);line-height:1.7;background:var(--bg);border-radius:8px;padding:10px 14px;margin-top:14px}
+.login-card .hint-users b{color:var(--ink)}
+.kv{display:flex;justify-content:space-between;padding:6px 0;font-size:12px}
+.kv .k{color:var(--ink-3)}.kv .v{color:var(--ink);font-weight:500}
+.modal-mask{position:fixed;inset:0;background:rgba(20,30,50,.38);z-index:400;display:none;align-items:center;justify-content:center;padding:18px}
+.modal-mask.open{display:flex}
+.modal{width:min(480px,100%);max-height:80vh;overflow:auto;background:#fff;border-radius:14px;box-shadow:0 16px 48px rgba(20,30,60,.25)}
+.modal-lg{width:min(680px,100%)}
+.modal-head{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+.modal-head b{font-size:15px}
+.modal-body{padding:18px;font-size:13px;line-height:1.7}
+.modal-close{font-size:22px;color:var(--ink-3);line-height:1}
+/* ===== 表单工具类（网格 / 分组 / 字段） ===== */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 18px}
+.form-grid .field{margin:0}
+.fspan2{grid-column:1/-1}
+.fgroup{grid-column:1/-1;margin-top:2px}
+.fgroup:first-child{margin-top:0}
+.fgroup-title{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--ink-2);margin-bottom:10px;letter-spacing:.3px}
+.fgroup-title::after{content:"";flex:1;height:1px;background:var(--line)}
+.fgroup-title .fico{font-size:13px}
+.field label{display:block;font-size:12px;font-weight:600;margin-bottom:5px;color:var(--ink-2)}
+.field .req{color:var(--red);margin-left:2px}
+.form-grid input,.form-grid select,.form-grid textarea{width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;outline:none;background:#fff;transition:border-color .15s, box-shadow .15s}
+.form-grid input:focus,.form-grid select:focus,.form-grid textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(31,111,255,.12)}
+.form-grid input[readonly]{background:#F7F8FA;color:var(--ink-3)}
+.form-actions{grid-column:1/-1;display:flex;gap:10px;margin-top:6px}
+.form-actions .btn{flex:1;padding:10px}
+.form-actions .btn-ghost{flex:0 0 auto;padding:10px 18px}
+.modal-foot{padding:12px 18px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:0;background:#fff}
+.section{margin-bottom:18px}
+.sect{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--ink);margin:20px 0 10px}
+.sect:first-child{margin-top:0}
+.sect::after{content:"";flex:1;height:1px;background:var(--line)}
+.sect .btn{font-weight:500}
+.cal-nav{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:12px}
+.cal-nav .mn{font-size:16px;font-weight:700;min-width:120px;text-align:center}
+.calendar{width:100%;border-collapse:collapse;table-layout:fixed}
+.calendar th{text-align:center;padding:8px 4px;font-size:12px;color:var(--ink-3);background:var(--bg)}
+.calendar td{text-align:center;padding:6px 4px;height:56px;vertical-align:top;border:1px solid var(--line);cursor:pointer;transition:.12s;position:relative}
+.calendar td:hover{background:#EEF4FF}
+.calendar td.other{color:var(--ink-3);background:#fafafa;cursor:default}
+.calendar td.today{background:#EEF4FF;font-weight:700}
+.calendar td.selected{background:var(--blue);color:#fff}
+.calendar td.selected .dnum{color:#fff}
+.calendar td .dnum{display:block;font-size:13px;margin-bottom:2px}
+.calendar td .dots{display:flex;justify-content:center;gap:3px;flex-wrap:wrap}
+.calendar td .dots .dot{width:6px;height:6px;border-radius:50%;background:var(--blue)}
+.calendar td .dots .dot.hi{background:var(--red)}
+.day-detail{margin-top:14px;background:var(--bg);border-radius:10px;padding:14px}
+.day-detail h3{font-size:13px;margin-bottom:10px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo"><div class="dot">AI</div>擎天学智 管理后台</div>
+  <span class="permission-badge super" id="permBadge" style="display:none"></span>
+  <div class="user-info" id="userInfoBox" style="display:none">
+    <span>👤</span><span id="loggedUser">未登录</span>
+    <button class="logout" onclick="doLogout()">退出</button>
+  </div>
+</div>
+
+<main>
+  <div class="admin">
+    <div class="anav" id="anav">
+      <div class="aitem active" data-page="dash" onclick="adminPage('dash')"><span class="ico">📊</span>数据看板</div>
+      <div class="aitem" data-page="emp" onclick="adminPage('emp')"><span class="ico">👥</span>员工管理</div>
+      <div class="aitem" data-page="cust" onclick="adminPage('cust')"><span class="ico">📇</span>客户管理</div>
+      <div class="aitem" data-page="order" onclick="adminPage('order')"><span class="ico">🧾</span>订单管理</div>
+      <div class="aitem" data-page="followup" onclick="adminPage('followup')"><span class="ico">📝</span>跟进记录</div>
+      <div class="aitem" data-page="tagm" onclick="adminPage('tagm')"><span class="ico">🏷️</span>标签管理</div>
+      <div class="aitem" data-page="sched" onclick="adminPage('sched')"><span class="ico">📅</span>日程管理</div>
+      <div class="aitem" data-page="perms" onclick="adminPage('perms')"><span class="ico">🔐</span>权限与组织</div>
+    </div>
+    <div class="acontent" id="acontent">
+      <div class="hint">登录后查看管理后台…</div>
+    </div>
+  </div>
+</main>
+
+<div class="drawer" id="drawer">
+  <div class="dhead"><b id="drawerTitle">客户详情</b><button onclick="closeDrawer()" style="font-size:20px;color:var(--ink-3)">✕</button></div>
+  <div class="dbody" id="drawerBody"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="modal-mask" id="objModal" onclick="if(event.target===this)closeObjModal()">
+  <div class="modal"><div class="modal-head"><b id="objModalTitle">详情</b><button class="modal-close" onclick="closeObjModal()">×</button></div>
+  <div class="modal-body" id="objModalBody"></div></div>
+</div>
+
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px">
+      <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#1F6FFF,#7B61FF);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:700">AI</div>
+      <span style="font-weight:700;font-size:17px">擎天学智</span>
+    </div>
+    <h2>管理后台登录</h2>
+    <div class="lsub">AI 智能销售辅助系统</div>
+    <div class="field"><label>用户名</label><input id="loginUser" placeholder="请输入用户名" autocomplete="username"></div>
+    <div class="field"><label>密码</label><input id="loginPass" type="password" placeholder="请输入密码" autocomplete="current-password"></div>
+    <button class="login-btn" onclick="doLogin()">登 录</button>
+    <div class="lerr" id="loginError"></div>
+  </div>
+</div>
+
+<script>
+/* ===================== 全局状态 ===================== */
+const API = "/api/admin";
+let CUR_ADMIN = null;
+let custFilter = "全部阶段";
+
+/* ===================== 工具 ===================== */
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");clearTimeout(window._tt);window._tt=setTimeout(()=>t.classList.remove("show"),2500);}
+function escapeHtml(s){if(s==null)return"";return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));}
+function fmtDate(s){if(!s)return"—";return String(s).replace("T"," ").replace(".000","").slice(0,16);}
+async function apiFetch(path,opts){
+  opts=opts||{};
+  opts.headers=opts.headers||{};
+  opts.headers["Content-Type"]="application/json";
+  opts.credentials="include";
+  var r=await fetch(path,opts);
+  if(r.status===401){toast("未登录或会话失效");doLogout();throw new Error("401");}
+  var j=await r.json().catch(function(){return {success:false,error:"返回不是 JSON"};});
+  if(!r.ok||!j.success){throw new Error(j.error||j.detail||r.statusText||"请求失败");}
+  return j.data;
+}
+function permBadgeFor(scope){if(scope==="all")return["super","🔑 全量数据"];if(scope==="region")return["region","📊 本区域"];return["normal","👤 本名下"];}
+
+/* ===================== 登录 / 登出 ===================== */
+async function doLogin(){
+  const u=document.getElementById("loginUser").value.trim();
+  const p=document.getElementById("loginPass").value.trim();
+  const err=document.getElementById("loginError");
+  if(!u||!p){err.textContent="请输入用户名和密码";err.style.display="block";return;}
+  try{
+    const r=await fetch(API+"/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:u,password:p}),credentials:"include"});
+    const j=await r.json().catch(()=>({success:false,detail:"返回不是 JSON"}));
+    if(!r.ok||!j.success){throw new Error(j.detail||"登录失败");}
+    CUR_ADMIN={user_id:j.data.user_id,name:j.data.name,data_scope:j.data.data_scope,role_codes:j.data.role_codes||[]};
+    document.getElementById("loginOverlay").style.display="none";
+    document.getElementById("userInfoBox").style.display="flex";
+    document.getElementById("loggedUser").textContent=`${CUR_ADMIN.name}（${CUR_ADMIN.user_id}）`;
+    const badge=document.getElementById("permBadge");
+    const [cls,label]=permBadgeFor(CUR_ADMIN.data_scope);
+    badge.className="permission-badge "+cls;badge.textContent=label;badge.style.display="inline";
+    adminPage("dash");
+  }catch(e){err.textContent=e.message;err.style.display="block";}
+}
+async function doLogout(){
+  try{await fetch(API+"/logout",{method:"POST",credentials:"include"});}catch(_){}
+  CUR_ADMIN=null;
+  document.getElementById("userInfoBox").style.display="none";
+  document.getElementById("permBadge").style.display="none";
+  document.getElementById("loginOverlay").style.display="flex";
+  document.getElementById("loginUser").value="";
+  document.getElementById("loginPass").value="";
+  document.getElementById("loginError").style.display="none";
+  document.getElementById("acontent").innerHTML="<div class='hint'>登录后查看管理后台…</div>";
+}
+
+/* ===================== 页面调度 ===================== */
+function adminPage(page){
+  document.querySelectorAll(".anav .aitem").forEach(b=>b.classList.toggle("active",b.dataset.page===page));
+  const pages={dash:pageDash,emp:pageEmp,cust:pageCust,order:pageOrder,followup:pageFollowup,tagm:pageTag,sched:pageSchedule,perms:pagePermOrg};
+  pages[page]();
+}
+
+/* ===================== 数据看板 ===================== */
+const CHART_PALETTE=["#1F6FFF","#7B61FF","#FF9F0A","#07C160","#FA5151","#00B8D9","#F76B15","#9AA3B2","#2BB673","#E845C3"];
+
+function renderDonut(el, data, centerLabel){
+  var rows=(data||[]).filter(function(d){return (d.value||0)>0;});
+  if(!rows.length){el.innerHTML="<div class='hint'>暂无数据</div>";return;}
+  var total=rows.reduce(function(a,d){return a+d.value;},0);
+  var r=58, C=2*Math.PI*r, offset=0, segs="";
+  rows.forEach(function(d,i){
+    var len=d.value/total*C;
+    var color=d.color||CHART_PALETTE[i%CHART_PALETTE.length];
+    segs+='<circle cx="80" cy="80" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="24" stroke-dasharray="'+len+' '+(C-len)+'" stroke-dashoffset="'+(0-offset)+'"></circle>';
+    offset+=len;
+  });
+  var legend=rows.map(function(d,i){
+    var color=d.color||CHART_PALETTE[i%CHART_PALETTE.length];
+    var pct=Math.round(d.value/total*100);
+    return '<div class="dleg"><span class="dot" style="background:'+color+'"></span><span class="dlb" title="'+escapeHtml(d.label)+'">'+escapeHtml(d.label)+'</span><span class="dlv">'+d.value+'</span><span class="dlp">'+pct+'%</span></div>';
+  }).join("");
+  el.innerHTML='<div class="donut-wrap"><svg viewBox="0 0 160 160" class="donut"><g transform="rotate(-90 80 80)">'+segs+'</g><text x="80" y="76" class="dcnt">'+total+'</text><text x="80" y="96" class="dlbl">'+(centerLabel||"总数")+'</text></svg><div class="dlegend">'+legend+'</div></div>';
+}
+
+function renderFunnel(el, steps, colors){
+  var arr=(steps||[]).filter(function(s){return (s.count||0)>0;});
+  if(!arr.length){el.innerHTML="<div class='hint'>暂无数据</div>";return;}
+  var max=Math.max.apply(null,arr.map(function(s){return s.count||0;}).concat([1]));
+  var html='<div class="funnel">';
+  arr.forEach(function(s,i){
+    var cnt=s.count||0;
+    var w=Math.max(Math.round(cnt/max*100),20);
+    var color=(colors&&colors[i])||CHART_PALETTE[i%CHART_PALETTE.length];
+    var bg='linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0) 42%, rgba(0,0,0,.06)), '+color;
+    html+='<div class="fstep">';
+    html+='<div class="fshape" style="width:'+w+'%;background:'+bg+'"><span class="fname">'+escapeHtml(s.name||"")+'</span><b class="fcnt">'+cnt+'</b><span class="funit">人</span></div>';
+    if(i>0){
+      var prev=arr[i-1].count||0;
+      var rate=prev>0?Math.round(cnt/prev*100):0;
+      html+='<div class="fconv">↓ 转化 '+rate+'%</div>';
+    }
+    html+='</div>';
+  });
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+async function pageDash(){
+  const a=document.getElementById("acontent");
+  const scope=CUR_ADMIN.data_scope;
+  const roleLbl=scope==="all"?"超级管理员":scope==="region"?"区域主管":"普通顾问";
+  // 数据汇总基于客户表 + 订单表统计
+  let totalCusts=0,totalOrders=0,revenue=0;
+  try{
+    const cl=await apiFetch(API+"/customer_list?page=1&page_size=100");
+    totalCusts=cl.total||0;
+  }catch(_){}
+  try{
+    const ol=await apiFetch(API+"/order_list");
+    totalOrders=ol.total||(Array.isArray(ol)?ol.length:(Array.isArray(ol.items)?ol.items.length:0));
+    const items=Array.isArray(ol)?ol:(ol.items||[]);
+    items.forEach(o=>{const a=parseFloat(o.amount); if(a&&!isNaN(a))revenue+=a;});
+  }catch(_){}
+  a.innerHTML=`<h2>📊 数据看板</h2><div class="sub">${roleLbl} 视图 · 数据实时刷新</div>
+    <div class="kpis">
+      <div class="kpi"><div class="l">👥 客户总数</div><div class="v">${totalCusts}</div><div class="d up">权限内可见</div></div>
+      <div class="kpi"><div class="l">🧾 订单总数</div><div class="v">${totalOrders}</div><div class="d">本视图</div></div>
+      <div class="kpi"><div class="l">💰 累计订单金额</div><div class="v">¥${revenue.toLocaleString()}</div><div class="d">权限内统计</div></div>
+      <div class="kpi"><div class="l">🤖 AI 采纳率</div><div class="v" id="kpiAdopt">—</div><div class="d">近30天 · 采纳÷(采纳+丢弃)</div></div>
+    </div>
+    <div class="grid2">
+      <div class="box"><h3>客户阶段分布</h3><div id="stageBar">加载中…</div></div>
+      <div class="box"><h3>线索来源分布</h3><div id="leadBar">加载中…</div></div>
+    </div>
+    <div class="grid2">
+      <div class="box"><h3>转化漏斗</h3><div id="funnelDiv">加载中…</div></div>
+      <div class="box"><h3>AI 采纳率<i class="tip" data-tip="采纳率 = 采纳 ÷（采纳 + 丢弃）× 100%。只有顾问对 AI 建议做出「采纳」或「丢弃」决定后才计入，仅展示未决定的（shown）不参与计算。">ⓘ</i></h3><div id="adoptDiv">加载中…</div></div>
+    </div>
+    <div class="permnote">当前「${roleLbl}」视图：${scope==="all"?"可查看全部企微账户数据并配置权限":scope==="region"?"仅可见本区域数据":"仅可见本人名下客户数据"}</div>`;
+  // 1. 客户列表按 stage 分组
+  try{
+    var cl=await apiFetch(API+"/customer_list?page=1&page_size=100");
+    var citems=cl.items||[];
+    var stageCount={}; citems.forEach(function(c){stageCount[c.stage]=(stageCount[c.stage]||0)+1;});
+    var stageColors={"潜在":"#9AA3B2","高意向":"#FF9F0A","试听":"#1F6FFF","在读":"#07C160"};
+    var stageData=Object.keys(stageCount).map(function(k){return {label:k,value:stageCount[k],color:stageColors[k]};});
+    renderDonut(document.getElementById("stageBar"),stageData,"客户");
+  }catch(e){document.getElementById("stageBar").innerHTML='<div class="hint">'+escapeHtml(e.message)+'</div>';}
+  try{
+    var s=await apiFetch(API+"/lead_source_stats");
+    var srcData=[];
+    if(Array.isArray(s)){
+      srcData=s.map(function(x){return {label:x.lead_source||"—",value:x.total||x.count||0};});
+    }else if(s&&typeof s==="object"){
+      srcData=Object.keys(s).map(function(k){return {label:k,value:s[k]||0};});
+    }
+    renderDonut(document.getElementById("leadBar"),srcData,"线索");
+  }catch(e){document.getElementById("leadBar").innerHTML='<div class="hint">'+escapeHtml(e.message)+'</div>';}
+  try{
+    var f=await apiFetch(API+"/dashboard/funnel");
+    var steps=(f&&f.steps)||(Array.isArray(f)?f:[]);
+    var funnelColors=["#1F6FFF","#7B61FF","#FF9F0A","#07C160"];
+    renderFunnel(document.getElementById("funnelDiv"),steps,funnelColors);
+  }catch(e){document.getElementById("funnelDiv").innerHTML='<div class="hint">'+escapeHtml(e.message)+'</div>';}
+  try{
+    var t=await apiFetch(API+"/dashboard/adopt_rate");
+    var byUser=(t&&t.by_user)||(Array.isArray(t)?t:[]);
+    var totalShown=t&&t.shown||0;
+    var totalAdopted=t&&t.adopted||0;
+    var totalDiscarded=t&&t.discarded||0;
+    var totalConfirmed=t&&t.confirmed||0;
+    var decided=totalAdopted+totalDiscarded;
+    var overallRate=decided>0?Math.round(totalAdopted/decided*100):null;
+    document.getElementById("kpiAdopt").textContent=overallRate==null?"—":(overallRate+"%");
+    var summary='<div style="margin-bottom:12px;font-size:12px;color:var(--ink-2)">近30天 AI 共展示 <b style="color:var(--ink)">'+totalShown+'</b> 次，顾问采纳 <b style="color:var(--green)">'+totalAdopted+'</b> 条、丢弃 <b style="color:var(--red)">'+totalDiscarded+'</b> 条'+(totalConfirmed?'，确认 <b style="color:var(--blue)">'+totalConfirmed+'</b> 条':'')+'；总采纳率 <b style="color:var(--blue)">'+(overallRate==null?'—':overallRate+'%')+'</b></div>';
+    var userRows=byUser.map(function(x){
+      var adopted=x.adopted_count||0, discarded=x.discarded_count||0;
+      var d=adopted+discarded;
+      var rate=d>0?Math.round(adopted/d*100):null;
+      return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:8px 12px;background:#fff;border-radius:8px;border:1px solid var(--line)">'+
+        '<span style="font-weight:600;font-size:13px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(x.user_name||x.user_id||"—")+'</span>'+
+        '<span style="font-size:12px;color:var(--ink-2)">采纳 <b style="color:var(--green)">'+adopted+'</b> · 丢弃 <b style="color:var(--red)">'+discarded+'</b></span>'+
+        '<span style="font-size:13px;font-weight:700;color:'+(rate==null?'var(--ink-3)':'var(--blue)')+';min-width:42px;text-align:right">'+(rate==null?'—':rate+'%')+'</span>'+
+        '</div>';
+    }).join("");
+    document.getElementById("adoptDiv").innerHTML=summary+(userRows||'<div class="hint">暂无AI采纳数据</div>');
+  }catch(e){document.getElementById("adoptDiv").innerHTML='<div class="hint">'+escapeHtml(e.message)+'</div>';}
+}
+
+/* ===================== 员工管理 ===================== */
+async function pageEmp(){
+  const a=document.getElementById("acontent");
+  a.innerHTML=`<h2>👥 员工管理</h2><div class="sub">顾问列表 · 角色权限 · 组织架构（权限范围：${CUR_ADMIN.data_scope}）</div>
+    <div class="filters"><input id="empKw" placeholder="搜索姓名…" style="width:160px"><input id="empDept" placeholder="部门关键字" style="width:160px"><button class="btn btn-blue btn-sm" onclick="loadEmpTable()">筛选</button><button class="btn btn-primary btn-sm" style="margin-left:8px" onclick="showAddEmp()">+ 添加员工</button></div>
+    <table class="tbl"><thead><tr><th>用户ID</th><th>姓名</th><th>所属片区</th><th>部门</th><th>企微账户</th><th>绑定状态</th><th>操作</th></tr></thead><tbody id="empTbody"><tr><td colspan="7">加载中…</td></tr></tbody></table>`;
+  loadEmpTable();
+}
+async function loadEmpTable(){
+  const kw=document.getElementById("empKw").value.trim();
+  const dept=document.getElementById("empDept").value.trim();
+  const tb=document.getElementById("empTbody");
+  try{
+    const list=await apiFetch(API+"/employees"+(kw?("?keyword="+encodeURIComponent(kw)):"")+(dept?((kw?"&":"?")+"dept="+encodeURIComponent(dept)):""));
+    const items=Array.isArray(list)?list:(list.items||[]);
+    if(items.length===0){tb.innerHTML=`<tr><td colspan="7">无可查看员工</td></tr>`;return;}
+    tb.innerHTML=items.map(function(e){
+      var wwName=e.wework_account_name||"";
+      var companyName=wwName.split(/[·\-]/)[0]||wwName;
+      var accountDisplay=companyName?companyName+"-"+e.name:"—";
+      return `<tr>
+      <td>${escapeHtml(e.user_id)}</td>
+      <td>${escapeHtml(e.name)}</td>
+      <td>${escapeHtml(e.wework_account_name||"—")}</td>
+      <td>${escapeHtml(e.dept||"—")}</td>
+      <td style="font-size:12px">${escapeHtml(accountDisplay)}</td>
+      <td><span class="status ${e.binding_status==="bound"?"s-ok":"s-wait"}">${e.binding_status==="bound"?"已绑定":"待绑定"}</span></td>
+      <td><button class="btn btn-ghost btn-sm" onclick="viewEmpCusts('${escapeHtml(e.user_id)}','${escapeHtml(e.name)}')">名下客户</button> <button class="btn btn-ghost btn-sm" onclick="showEditEmp('${escapeHtml(e.user_id)}','${escapeHtml(e.name)}','${escapeHtml(e.dept||"")}','${escapeHtml(wwName)}')">编辑</button> ${e.binding_status!=="bound"?`<button class="btn btn-ghost btn-sm" onclick="showBindWework('${escapeHtml(e.user_id)}')">绑定企微</button> `:""}<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteEmp('${escapeHtml(e.user_id)}','${escapeHtml(e.name)}')">删除</button></td>
+    </tr>`;
+    }).join("");
+  }catch(e){tb.innerHTML=`<tr><td colspan="7" style="color:var(--red)">${escapeHtml(e.message)}</td></tr>`;}
+}
+async function viewEmpCusts(uid,name){
+  try{
+    const c=await apiFetch(API+"/employee_customers/"+encodeURIComponent(uid));
+    const items=Array.isArray(c)?c:(c.items||[]);
+    openObjModal(`${name}（${uid}）名下客户`,items.length?("<table class='tbl'><thead><tr><th>客户</th><th>学生</th><th>年级</th><th>阶段</th></tr></thead><tbody>"+items.map(x=>`<tr><td>${escapeHtml(x.name||"")}</td><td>${escapeHtml(x.child_name||"")}</td><td>${escapeHtml(x.grade||"")}</td><td><span class="status s-wait">${escapeHtml(x.stage||"")}</span></td></tr>`).join("")+"</tbody></table>"):"<div class='hint'>暂无客户</div>");
+  }catch(e){openObjModal("错误",e.message);}
+}
+async function showAddEmp(){
+  var wwList=[];
+  try{var ww=await apiFetch(API+"/wework_accounts"); wwList=Array.isArray(ww)?ww:[];}catch(e){}
+  var areaOpts=wwList.map(function(a){return '<option value="'+escapeHtml(a.account_id)+'">'+escapeHtml(a.account_name||a.account_id)+'</option>';}).join("");
+  openObjModal("添加员工",
+    '<div class="form-grid">'+
+    '<div class="field"><label>用户ID<span class="req">*</span>（登录用）</label><input id="newEmpId" placeholder="如 hejing"></div>'+
+    '<div class="field"><label>姓名<span class="req">*</span></label><input id="newEmpName" placeholder="如何静"></div>'+
+    '<div class="field"><label>密码<span class="req">*</span></label><input id="newEmpPwd" type="password" placeholder="密码"></div>'+
+    '<div class="field"><label>绑定企微账户</label><input id="newEmpWework" placeholder="输入企微账户ID，如 sz"></div>'+
+    '<div class="field fspan2"><label>所属片区<span class="req">*</span></label><select id="newEmpArea" onchange="onAreaChange()"><option value="">请选择片区</option>'+areaOpts+'</select></div>'+
+    '<div class="field fspan2"><label>部门</label><div style="display:flex;align-items:center;gap:4px"><span id="newEmpDeptPrefix" style="color:var(--ink-2);font-size:13px;white-space:nowrap"></span><input id="newEmpDeptSuffix" placeholder="如 深圳一组"></div></div>'+
+    '<div class="form-actions"><button class="btn btn-ghost" onclick="closeObjModal()">取消</button><button class="btn btn-blue" onclick="addEmployee()">确认添加</button></div></div>');
+  window._addWeworkAccounts=wwList;
+}
+function onAreaChange(){
+  var areaId=document.getElementById("newEmpArea").value;
+  if(!areaId){document.getElementById("newEmpDeptPrefix").textContent="";return;}
+  var accounts=window._addWeworkAccounts||[];
+  var account=accounts.find(function(a){return a.account_id===areaId;});
+  var region="";
+  if(account){
+    var m=account.account_name.match(/\(([^)]+)\)/);
+    region=m?m[1]:"";
+  }
+  document.getElementById("newEmpDeptPrefix").textContent=region?region+"·":"";
+}
+async function addEmployee(){
+  var uid=document.getElementById("newEmpId").value.trim();
+  var name=document.getElementById("newEmpName").value.trim();
+  var pwd=document.getElementById("newEmpPwd").value.trim();
+  var areaId=document.getElementById("newEmpArea").value;
+  var deptPrefix=document.getElementById("newEmpDeptPrefix").textContent;
+  var deptSuffix=document.getElementById("newEmpDeptSuffix").value.trim();
+  var dept=deptPrefix+deptSuffix;
+  var ww=document.getElementById("newEmpWework").value.trim();
+  if(!uid||!name||!pwd){toast("用户ID、姓名和密码为必填项");return;}
+  if(!areaId){toast("请选择所属片区");return;}
+  try{
+    var body={user_id:uid,name:name,password:pwd,dept:dept};
+    if(ww){body.wework_account_id=ww;}
+    await apiFetch(API+"/employees",{method:"POST",body:JSON.stringify(body)});
+    closeObjModal(); toast("员工 "+name+" 添加成功 ✓"); loadEmpTable();
+  }catch(e){toast("添加失败："+e.message);}
+}
+async function showEditEmp(uid,name,dept,areaName){
+  var wwList=[];
+  try{var ww=await apiFetch(API+"/wework_accounts"); wwList=Array.isArray(ww)?ww:[];}catch(e){}
+  window._editWeworkAccounts=wwList;
+  var currentWwId="";
+  var currentRegionPrefix="";
+  var currentSuffix=dept||"";
+  // Find matching wework account from areaName
+  for(var i=0;i<wwList.length;i++){
+    if(wwList[i].account_name===areaName){currentWwId=wwList[i].account_id;break;}
+  }
+  if(currentWwId){
+    var m=areaName.match(/\(([^)]+)\)/);
+    var region=m?m[1]:"";
+    currentRegionPrefix=region?region+"·":"";
+    if(currentSuffix.indexOf(currentRegionPrefix)===0)currentSuffix=currentSuffix.slice(currentRegionPrefix.length);
+  }
+  var areaOpts=wwList.map(function(a){return '<option value="'+escapeHtml(a.account_id)+'"'+(a.account_id===currentWwId?' selected':'')+'>'+escapeHtml(a.account_name||a.account_id)+'</option>';}).join("");
+  openObjModal("编辑员工 — "+name,
+    '<div class="form-grid">'+
+    '<div class="field"><label>用户ID</label><input value="'+escapeHtml(uid)+'" readonly></div>'+
+    '<div class="field"><label>姓名</label><input id="editEmpName" value="'+escapeHtml(name)+'"></div>'+
+    '<div class="field"><label>所属片区</label><select id="editEmpArea" onchange="onEditAreaChange()"><option value="">请选择</option>'+areaOpts+'</select></div>'+
+    '<div class="field"><label>部门</label><div style="display:flex;align-items:center;gap:4px"><span id="editEmpDeptPrefix" style="color:var(--ink-2);font-size:13px;white-space:nowrap">'+escapeHtml(currentRegionPrefix)+'</span><input id="editEmpDeptSuffix" value="'+escapeHtml(currentSuffix)+'" placeholder="如 深圳一组"></div></div>'+
+    '<div class="form-actions"><button class="btn btn-ghost" onclick="closeObjModal()">取消</button><button class="btn btn-blue" onclick="saveEditEmp(\''+escapeHtml(uid)+'\')">保存修改</button></div></div>');
+}
+function onEditAreaChange(){
+  var areaId=document.getElementById("editEmpArea").value;
+  if(!areaId){document.getElementById("editEmpDeptPrefix").textContent="";return;}
+  var accounts=window._editWeworkAccounts||[];
+  var account=accounts.find(function(a){return a.account_id===areaId;});
+  var region="";
+  if(account){
+    var m=account.account_name.match(/\(([^)]+)\)/);
+    region=m?m[1]:"";
+  }
+  document.getElementById("editEmpDeptPrefix").textContent=region?region+"·":"";
+}
+async function saveEditEmp(uid){
+  var name=document.getElementById("editEmpName").value.trim();
+  var deptPrefix=document.getElementById("editEmpDeptPrefix").textContent;
+  var deptSuffix=document.getElementById("editEmpDeptSuffix").value.trim();
+  var dept=deptPrefix+deptSuffix;
+  if(!name){toast("姓名不能为空");return;}
+  try{
+    await apiFetch(API+"/employees/"+encodeURIComponent(uid),{method:"PUT",body:JSON.stringify({name:name,dept:dept||null})});
+    closeObjModal(); toast("员工信息已更新 ✓"); loadEmpTable();
+  }catch(e){toast("更新失败："+e.message);}
+}
+async function showBindWework(uid){
+  var wwList=[];
+  try{var ww=await apiFetch(API+"/wework_accounts"); wwList=Array.isArray(ww)?ww:[];}catch(e){}
+  var opts=wwList.map(function(a){return '<option value="'+escapeHtml(a.account_id)+'">'+escapeHtml(a.account_name||a.account_id)+'</option>';}).join("");
+  openObjModal("绑定企微账户 — "+uid,
+    '<div class="form-grid">'+
+    '<div class="field fspan2"><label>选择企微账户<span class="req">*</span></label><select id="bindWwSelect"><option value="">请选择</option>'+opts+'</select></div>'+
+    '<div class="form-actions"><button class="btn btn-ghost" onclick="closeObjModal()">取消</button><button class="btn btn-blue" onclick="bindWework(\''+escapeHtml(uid)+'\')">确认绑定</button></div></div>');
+}
+async function bindWework(uid){
+  var ww=document.getElementById("bindWwSelect").value;
+  if(!ww){toast("请选择企微账户");return;}
+  try{
+    await apiFetch(API+"/bind_wework",{method:"POST",body:JSON.stringify({user_id:uid,wework_account_id:ww})});
+    closeObjModal(); toast("绑定成功 ✓"); loadEmpTable();
+  }catch(e){toast("绑定失败："+e.message);}
+}
+async function deleteEmp(uid,name){
+  if(!confirm("确定删除员工「"+name+"」("+uid+")？此操作不可撤销。"))return;
+  try{
+    await apiFetch(API+"/employees/"+encodeURIComponent(uid),{method:"DELETE"});
+    toast("已删除 "+name); loadEmpTable();
+  }catch(e){toast("删除失败："+e.message);}
+}
+async function attachRoles(uid){
+  try{
+    const r=await apiFetch(API+"/user_roles/"+encodeURIComponent(uid));
+    openObjModal(`${uid} 的角色分配`,Array.isArray(r)?`<div>${r.map(x=>`<div class="kv"><span class="k">${escapeHtml(x.role_code||"")}</span><span class="v">${escapeHtml(x.wework_account_id||"")}</span></div>`).join("")}</div>`:JSON.stringify(r));
+  }catch(e){openObjModal("错误",e.message);}
+}
+
+/* ===================== 客户管理 ===================== */
+async function pageCust(){
+  const a=document.getElementById("acontent");
+  a.innerHTML=`<h2>📇 客户管理</h2><div class="sub">客户列表 · 画像查看 · 支持按阶段/关键字筛选（权限：${CUR_ADMIN.data_scope}）</div>
+    <div class="filters">
+      <select id="custStage" onchange="custFilter=this.value;loadCustTable()">
+        ${["全部阶段","高意向","试听","在读","潜在"].map(s=>`<option ${custFilter===s?'selected':''}>${s}</option>`).join("")}
+      </select>
+      <input id="custKw" placeholder="搜索客户/学生…" style="width:150px">
+      <button class="btn btn-blue btn-sm" onclick="loadCustTable()">筛选</button>
+    </div>
+    <table class="tbl"><thead><tr><th>客户ID</th><th>家长</th><th>学生</th><th>年级</th><th>科目</th><th>阶段</th><th>顾问</th><th>操作</th></tr></thead><tbody id="custTbody"><tr><td colspan="8">加载中…</td></tr></tbody></table>
+    <div class="pagebar" id="custPager"></div>`;
+  loadCustTable();
+}
+async function loadCustTable(page=1){
+  const kw=document.getElementById("custKw")?document.getElementById("custKw").value.trim():"";
+  let url=API+"/customer_list?page="+page+"&page_size=20";
+  if(custFilter!=="全部阶段")url+="&stage="+encodeURIComponent(custFilter);
+  if(kw)url+="&keyword="+encodeURIComponent(kw);
+  const tb=document.getElementById("custTbody");
+  try{
+    const j=await apiFetch(url);
+    const items=j.items||[]; const total=j.total||items.length;
+    if(items.length===0){tb.innerHTML=`<tr><td colspan="8" class='hint'>权限内暂无客户</td></tr>`;document.getElementById("custPager").innerHTML="";return;}
+    tb.innerHTML=items.map(c=>`<tr style="cursor:pointer" onclick="openCust('${escapeHtml(c.external_id)}','${escapeHtml(c.follow_user_id||"")}')">
+      <td>${escapeHtml(c.external_id||"")}</td><td>${escapeHtml(c.name||"")}</td><td>${escapeHtml(c.child_name||"")}</td>
+      <td>${escapeHtml(c.grade||"")}</td><td>${escapeHtml(c.focus_subject||"")}</td>
+      <td><span class="status ${c.stage==="高意向"?"s-wait":c.stage==="在读"?"s-ok":"s-off"}">${escapeHtml(c.stage||"—")}</span></td>
+      <td>${escapeHtml(c.follow_user_id||"—")}</td>
+      <td><button class="btn btn-blue btn-sm" onclick="event.stopPropagation();openCust('${escapeHtml(c.external_id)}','${escapeHtml(c.follow_user_id||"")}')">查看 →</button></td>
+    </tr>`).join("");
+    const total_pages=Math.max(1,Math.ceil(total/20));
+    let pager=""; for(let i=1;i<=Math.min(total_pages,8);i++){pager+=`<button class="${page===i?'active':''}" onclick="loadCustTable(${i})">${i}</button>`;}
+    document.getElementById("custPager").innerHTML=`${pager} <span style="margin-left:8px" class="hint">共 ${total} 条</span>`;
+  }catch(e){tb.innerHTML=`<tr><td colspan="8" style="color:var(--red)">${escapeHtml(e.message)}</td></tr>`;}
+}
+async function openCust(ext,uid){
+  try{
+    const c=await apiFetch(API+"/customer_detail/"+encodeURIComponent(uid)+"/"+encodeURIComponent(ext));
+    const tags=[];
+    let union=c.union_id||"";
+    let timelineHtml="加载中…";
+    try{
+      const tl=await apiFetch(API+"/customer_timeline/"+encodeURIComponent(ext));
+      timelineHtml=Array.isArray(tl)&&tl.length?("<div class='timeline'>"+tl.map(x=>`<div class="tl-item"><div class="tl-t">${escapeHtml(fmtDate(x.time))} · ${escapeHtml(x.type||"")}</div><div class="tl-c">${escapeHtml((x.data&&x.data.content)||(x.data&&x.data.title)||JSON.stringify(x.data||{}))}${x.type==="chat"?'<span class="aiflag">I3</span>':''}</div></div>`).join("")+"</div>"):"<div class='hint'>暂无时间线</div>";
+    }catch(e){timelineHtml=escapeHtml(e.message);}
+    let ordersHtml="<div class='hint'>无订单</div>";
+    if(union){
+      try{const o=await apiFetch(API+"/customer_orders/"+encodeURIComponent(union));ordersHtml=(Array.isArray(o)&&o.length)?("<table class='tbl'><thead><tr><th>订单号</th><th>金额</th><th>状态</th><th>日期</th></tr></thead><tbody>"+o.map(x=>`<tr><td>${escapeHtml(x.order_id||"")}</td><td>¥${x.amount||0}</td><td><span class="status ${x.status==="进行中"?"s-ok":x.status==="待使用"?"s-wait":"s-off"}">${escapeHtml(x.status||"")}</span></td><td>${escapeHtml(String(x.order_date||"").slice(0,10))}</td></tr>`).join("")+"</tbody></table>"):"<div class='hint'>暂无订单</div>";}catch(e){ordersHtml=escapeHtml(e.message);}
+    }
+    window._curCust=c;
+    document.getElementById("drawerTitle").textContent=`${c.name||""}（${c.child_name||""}）`;
+    document.getElementById("drawerBody").innerHTML=`
+      <div class="dsec" style="display:flex;gap:10px;margin-bottom:16px">
+        <button class="btn btn-blue btn-sm" onclick="editCustomer()">✏️ 编辑客户</button>
+        <button class="btn btn-ghost btn-sm" onclick="showAddTag()">＋ 添加标签</button>
+      </div>
+      <div class="dsec">
+        <div class="dsec-title"><span class="fico">👤</span>基本信息</div>
+        <div class="kv-grid">
+          <div class="kv"><span class="k">客户ID</span><span class="v">${escapeHtml(c.external_id||"—")}</span></div>
+          <div class="kv"><span class="k">负责顾问</span><span class="v">${escapeHtml(c.follow_user_id||"—")}</span></div>
+          <div class="kv"><span class="k">客户阶段</span><span class="v">${escapeHtml(c.stage||"—")}</span></div>
+          <div class="kv"><span class="k">线索来源</span><span class="v">${escapeHtml(c.lead_source||"—")}</span></div>
+          <div class="kv"><span class="k">学校</span><span class="v">${escapeHtml(c.school||"—")}</span></div>
+          <div class="kv"><span class="k">union_id</span><span class="v">${escapeHtml(c.union_id||"—")}</span></div>
+        </div>
+        ${c.remark?`<div style="margin-top:8px;background:#FFF8EB;border:1px solid #F5E6C4;border-radius:8px;padding:8px 12px;font-size:12px;color:var(--ink-2)"><b>备注：</b>${escapeHtml(c.remark)}</div>`:""}
+      </div>
+      <div class="dsec">
+        <div class="dsec-title"><span class="fico">🏷️</span>客户标签</div>
+        <div class="box" id="custTagsBox" style="min-height:30px">加载中…</div>
+      </div>
+      <div class="dsec">
+        <div class="dsec-title"><span class="fico">🕘</span>客户触达时间线</div>
+        <div class="box">${timelineHtml}</div>
+      </div>
+      <div class="dsec">
+        <div class="dsec-title"><span class="fico">🧾</span>订单</div>
+        <div class="box">${ordersHtml}</div>
+      </div>`;
+    document.getElementById("drawer").classList.add("open");
+    loadCustTags(c.external_id);
+  }catch(e){toast("加载失败："+e.message);}
+}
+function closeDrawer(){document.getElementById("drawer").classList.remove("open");}
+async function loadCustTags(ext){
+  var box=document.getElementById("custTagsBox");
+  if(!box)return;
+  try{
+    var j=await apiFetch(API+"/customer_tags/"+encodeURIComponent(ext));
+    var tags=j.tags||[];
+    if(!tags.length){box.innerHTML='<div class="hint">暂无标签</div>';return;}
+    box.innerHTML=tags.map(function(t){
+      var label=t.confirmed?'<span style="color:var(--green)">✓</span> ':'<span style="color:var(--ink-3)">待确认</span> ';
+      return '<span style="display:inline-flex;align-items:center;gap:4px;background:#EEF4FF;color:var(--blue);padding:3px 10px;border-radius:12px;font-size:12px;margin:2px 4px 2px 0">'+label+escapeHtml(t.tag_name||t.tag_id)+'</span>';
+    }).join("");
+  }catch(e){box.innerHTML='<div class="hint">'+escapeHtml(e.message)+'</div>';}
+}
+function showAddTag(){
+  var c=window._curCust;
+  if(!c){toast("请先打开客户详情");return;}
+  openObjModal("为客户添加标签（"+escapeHtml(c.name||c.external_id)+"）",'<div id="addTagList" class="hint">加载标签库…</div>');
+  loadTagPicker(c.external_id);
+}
+async function loadTagPicker(ext){
+  var box=document.getElementById("addTagList");
+  try{
+    var j=await apiFetch(API+"/customer_tags/"+encodeURIComponent(ext));
+    var all=j.all_tags||[];
+    var existing=(j.tags||[]).map(function(t){return t.tag_id;});
+    var flat=[];
+    all.forEach(function(s){ (s.groups||[]).forEach(function(g){ (g.tags||[]).forEach(function(t){ flat.push({tag_id:t.tag_id,tag_name:t.tag_name,group_name:g.group_name||""}); }); }); });
+    if(!flat.length){box.innerHTML='<div class="hint">标签库为空，请先在「标签管理」中创建标签</div>';return;}
+    box.innerHTML='<div style="max-height:320px;overflow:auto">'+flat.map(function(t){
+      var used=existing.indexOf(t.tag_id)>=0;
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--line)"><div><div style="font-size:13px">'+escapeHtml(t.tag_name)+'</div><div class="hint">'+escapeHtml(t.group_name||"")+' · '+escapeHtml(t.tag_id)+'</div></div>'+(used?'<span style="color:var(--ink-3);font-size:12px">已添加</span>':'<button class="btn btn-blue btn-sm" onclick="addTagToCustomer(\''+escapeHtml(t.tag_id)+'\',\''+escapeHtml(t.tag_name)+'\')">添加</button>')+'</div>';
+    }).join("")+'</div>';
+  }catch(e){box.innerHTML='<div style="color:var(--red)">'+escapeHtml(e.message)+'</div>';}
+}
+async function addTagToCustomer(tagId,tagName){
+  var c=window._curCust;
+  if(!c)return;
+  try{
+    await apiFetch(API+"/tags/"+encodeURIComponent(tagId)+"/customers/"+encodeURIComponent(c.external_id),{method:"POST"});
+    toast("已添加标签「"+tagName+"」 ✓");
+    closeObjModal();
+    loadCustTags(c.external_id);
+  }catch(e){toast("添加失败："+e.message);}
+}
+function editCustomer(){
+  const c=window._curCust;
+  if(!c){toast("请先打开客户详情");return;}
+  const stages=["潜在","高意向","试听","在读"];
+  const stageOpts=stages.map(s=>`<option value="${s}" ${(c.stage||"")===s?"selected":""}>${s}</option>`).join("");
+  openObjModal("编辑客户",`
+    <div class="form-grid">
+      <div class="fgroup"><div class="fgroup-title"><span class="fico">👤</span>基本信息</div></div>
+      <div class="field"><label>客户ID</label><input id="ec_ext" value="${escapeHtml(c.external_id||"")}" readonly></div>
+      <div class="field"><label>负责顾问</label><input id="ec_follow" value="${escapeHtml(c.follow_user_id||"")}" readonly></div>
+      <div class="field"><label>家长姓名</label><input id="ec_name" value="${escapeHtml(c.name||"")}"></div>
+      <div class="field"><label>学生姓名</label><input id="ec_child" value="${escapeHtml(c.child_name||"")}"></div>
+      <div class="fgroup"><div class="fgroup-title"><span class="fico">📚</span>学习信息</div></div>
+      <div class="field"><label>学校</label><input id="ec_school" value="${escapeHtml(c.school||"")}"></div>
+      <div class="field"><label>年级</label><input id="ec_grade" value="${escapeHtml(c.grade||"")}"></div>
+      <div class="field"><label>关注科目</label><input id="ec_subject" value="${escapeHtml(c.focus_subject||"")}"></div>
+      <div class="field"><label>客户阶段</label><select id="ec_stage">${stageOpts}</select></div>
+      <div class="fgroup"><div class="fgroup-title"><span class="fico">📈</span>跟进信息</div></div>
+      <div class="field"><label>线索来源</label><input id="ec_source" value="${escapeHtml(c.lead_source||"")}"></div>
+      <div class="field"><label>union_id</label><input id="ec_union" value="${escapeHtml(c.union_id||"")}" readonly></div>
+      <div class="field fspan2"><label>备注</label><textarea id="ec_remark" rows="3" style="resize:vertical">${escapeHtml(c.remark||"")}</textarea></div>
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="closeObjModal()">取消</button>
+        <button class="btn btn-blue" onclick="submitEditCustomer()">保存修改</button>
+      </div>
+    </div>`,"lg");
+}
+async function submitEditCustomer(){
+  const c=window._curCust;
+  if(!c)return;
+  const body={
+    name:document.getElementById("ec_name").value.trim()||null,
+    child_name:document.getElementById("ec_child").value.trim()||null,
+    school:document.getElementById("ec_school").value.trim()||null,
+    grade:document.getElementById("ec_grade").value.trim()||null,
+    focus_subject:document.getElementById("ec_subject").value.trim()||null,
+    stage:document.getElementById("ec_stage").value,
+    lead_source:document.getElementById("ec_source").value.trim()||null,
+    remark:document.getElementById("ec_remark").value.trim()||null
+  };
+  try{
+    await apiFetch(API+"/customers/"+encodeURIComponent(c.external_id),{method:"PUT",body:JSON.stringify(body)});
+    toast("客户已更新 ✓"); closeObjModal(); openCust(c.external_id,c.follow_user_id||"");
+  }catch(e){toast("更新失败："+e.message);}
+}
+
+/* ===================== 订单管理 ===================== */
+async function pageOrder(){
+  const a=document.getElementById("acontent");
+  a.innerHTML=`<h2>🧾 订单管理</h2><div class="sub">订单列表 · 状态流转 · 关联客户（权限：${CUR_ADMIN.data_scope}）</div>
+    <div class="filters"><input id="ordKw" placeholder="搜索订单号…" style="width:160px"><button class="btn btn-blue btn-sm" onclick="loadOrdTable()">筛选</button><button class="btn btn-blue btn-sm" onclick="showCreateOrder()" style="margin-left:8px">＋ 新增订单</button></div>
+    <table class="tbl"><thead><tr><th>订单号</th><th>客户姓名</th><th>账户</th><th>产品</th><th>金额</th><th>状态</th><th>下单日期</th><th>操作</th></tr></thead><tbody id="ordTbody"><tr><td colspan="8">加载中…</td></tr></tbody></table>`;
+  loadOrdTable();
+}
+const ORD_STATUSES=["进行中","待使用","已完结","已退款"];
+async function loadOrdTable(){
+  const kw=document.getElementById("ordKw").value.trim();
+  const url=API+"/order_list"+(kw?("?keyword="+encodeURIComponent(kw)):"");
+  const tb=document.getElementById("ordTbody");
+  try{
+    const j=await apiFetch(url);
+    const items=Array.isArray(j)?j:(j.items||[]);
+    if(items.length===0){tb.innerHTML=`<tr><td colspan="8" class='hint'>权限内无订单</td></tr>`;return;}
+    tb.innerHTML=items.map(o=>{
+      const products=(()=>{const p=o.product_names; if(!p) return "—"; let v=p; if(typeof v==="string"){try{v=JSON.parse(v);}catch(e){return v;}} if(Array.isArray(v))return v.join("、"); if(v&&typeof v==="object")return v.name||JSON.stringify(v); return String(v);})();
+      const cur=o.status||"进行中";
+      const sel=ORD_STATUSES.map(s=>`<option value="${s}" ${s===cur?"selected":""}>${s}</option>`).join("");
+      return `<tr><td>${escapeHtml(o.order_id||"")}</td><td>${escapeHtml(o.customer_name||o.name||o.union_id||"—")}</td><td>${escapeHtml(o.wework_account_id||"")}</td><td>${escapeHtml(products)}</td><td>¥${o.amount||0}</td>
+      <td><span class="status ${cur==="进行中"?"s-ok":cur==="待使用"?"s-wait":cur==="已退款"?"s-off":"s-ok"}">${escapeHtml(cur)}</span></td><td>${escapeHtml(String(o.order_date||"").slice(0,10))}</td>
+      <td><select onchange="updateOrderStatus('${escapeHtml(o.order_id||"")}', this.value)" style="padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;font-size:12px">${sel}</select></td></tr>`;
+    }).join("");
+  }catch(e){tb.innerHTML=`<tr><td colspan="8" style="color:var(--red)">${escapeHtml(e.message)}</td></tr>`;}
+}
+async function updateOrderStatus(orderId,status){
+  try{
+    await apiFetch(API+"/orders/"+encodeURIComponent(orderId),{method:"PUT",body:JSON.stringify({status:status})});
+    toast("订单状态已更新 ✓");
+  }catch(e){toast("更新失败："+e.message);loadOrdTable();}
+}
+function showCreateOrder(){
+  openObjModal("新增订单",`
+    <div class="form-grid">
+      <div class="field"><label>订单号<span class="req">*</span></label><input id="ord_new_id" placeholder="如 ORD20260813001"></div>
+      <div class="field"><label>客户姓名<span class="req">*</span></label><input id="ord_new_cust" placeholder="如 张小明"></div>
+      <div class="field fspan2"><label>产品名称</label><input id="ord_new_product" placeholder="如 试听券"></div>
+      <div class="field"><label>金额</label><input id="ord_new_amount" type="number" step="0.01" placeholder="如 299"></div>
+      <div class="field"><label>状态</label><select id="ord_new_status"><option>进行中</option><option>待使用</option><option>已完结</option><option>已退款</option></select></div>
+      <div class="field fspan2"><label>下单日期</label><input id="ord_new_date" type="date"></div>
+      <div class="form-actions"><button class="btn btn-ghost" onclick="closeObjModal()">取消</button><button class="btn btn-blue" onclick="submitCreateOrder()">创建订单</button></div>
+    </div>`);
+}
+async function submitCreateOrder(){
+  const order_id=document.getElementById("ord_new_id").value.trim();
+  const customer_name=document.getElementById("ord_new_cust").value.trim();
+  const product_name=document.getElementById("ord_new_product").value.trim()||null;
+  const amountRaw=document.getElementById("ord_new_amount").value;
+  const amount=amountRaw===""?null:parseFloat(amountRaw);
+  const status=document.getElementById("ord_new_status").value;
+  const order_date=document.getElementById("ord_new_date").value||null;
+  if(!order_id){toast("请填写订单号");return;}
+  if(!customer_name){toast("请填写客户姓名");return;}
+  try{
+    await apiFetch(API+"/order",{method:"POST",body:JSON.stringify({order_id:order_id,customer_name:customer_name,product_name:product_name,amount:amount,status:status,order_date:order_date})});
+    toast("订单已创建 ✓"); closeObjModal(); pageOrder();
+  }catch(e){toast("创建失败："+e.message);}
+}
+
+/* ===================== 跟进记录 ===================== */
+var _followUps=[];
+const FU_TYPES=["电话","试听","线下面谈","外勤","外勤拜访","其他"];
+const FU_RESULTS=["已联系","未接通","改期","已到店","已试听","已成交","拒绝","有效联系","有意向","无意向","待跟进"];
+function fuOpts(list,cur,allowEmpty){
+  var h="";
+  if(allowEmpty)h='<option value=""'+(cur?"":" selected")+'>（未选择）</option>';
+  h+=list.map(s=>`<option value="${s}" ${s===cur?"selected":""}>${s}</option>`).join("");
+  if(cur&&list.indexOf(cur)===-1)h='<option value="'+escapeHtml(cur)+'" selected>'+escapeHtml(cur)+'</option>'+h;
+  return h;
+}
+async function pageFollowup(){
+  const a=document.getElementById("acontent");
+  a.innerHTML=`<h2>📝 CRM 跟进记录</h2><div class="sub">电话/试听/线下面谈/外勤（V3.1，权限：${CUR_ADMIN.data_scope}）</div>
+    <div class="filters" style="margin-bottom:12px">
+      <button class="btn btn-blue btn-sm" onclick="showCreateFollowUp()">＋ 新建跟进</button>
+      <select id="fuTypeFilter" style="margin-left:12px" onchange="loadFuTable()"><option value="">全部类型</option>${FU_TYPES.map(s=>`<option>${s}</option>`).join("")}</select>
+      <select id="fuResultFilter" style="margin-left:8px" onchange="loadFuTable()"><option value="">全部结果</option>${FU_RESULTS.map(s=>`<option>${s}</option>`).join("")}</select>
+    </div>
+    <table class="tbl" style="margin-top:12px"><thead><tr><th>客户</th><th>跟进类型</th><th>内容</th><th>结果</th><th>跟进时间</th><th>下一步</th><th>操作</th></tr></thead><tbody id="fuTbody"><tr><td colspan="7">加载中…</td></tr></tbody></table>`;
+  loadFuTable();
+}
+async function loadFuTable(){
+  const tb=document.getElementById("fuTbody");
+  try{
+    var fuType=document.getElementById("fuTypeFilter").value;
+    var fuResult=document.getElementById("fuResultFilter").value;
+    var fuUrl=API+"/follow_up_list?page_size=100";
+    if(fuType)fuUrl+="&follow_up_type="+encodeURIComponent(fuType);
+    if(fuResult)fuUrl+="&result="+encodeURIComponent(fuResult);
+    const list=await apiFetch(fuUrl);
+    _followUps=Array.isArray(list)?list:(list.items||[]);
+    if(_followUps.length===0){tb.innerHTML='<tr><td colspan="7" class="hint">暂无跟进记录</td></tr>';return;}
+    tb.innerHTML=_followUps.map(function(f,i){
+      return '<tr><td>'+escapeHtml(f.customer_name||f.name||"—")+' <span style="color:var(--ink-3);font-size:11px">'+escapeHtml(f.external_id||"")+'</span></td><td><span class="status s-ai">'+escapeHtml(f.follow_up_type||"")+'</span></td><td>'+escapeHtml(f.content||"—")+'</td><td>'+escapeHtml(f.result||"—")+'</td><td>'+escapeHtml(fmtDate(f.follow_up_time))+'</td><td>'+escapeHtml(f.next_action||"—")+'</td><td><button class="btn btn-ghost btn-sm" onclick="editFollowUp('+i+')">编辑</button></td></tr>';
+    }).join("");
+  }catch(e){tb.innerHTML='<tr><td colspan="7" style="color:var(--red)">'+escapeHtml(e.message)+'</td></tr>';}
+}
+function editFollowUp(i){
+  var f=_followUps[i];
+  if(!f)return;
+  openObjModal("编辑跟进记录",
+    '<div class="form-grid">'+
+    '<div class="field"><label>客户ID</label><input id="efu_ext" value="'+escapeHtml(f.external_id||"")+'" readonly></div>'+
+    '<div class="field"><label>跟进类型</label><select id="efu_type">'+fuOpts(FU_TYPES,f.follow_up_type)+'</select></div>'+
+    '<div class="field fspan2"><label>内容</label><textarea id="efu_content" rows="3" style="resize:vertical">'+escapeHtml(f.content||"")+'</textarea></div>'+
+    '<div class="field"><label>结果</label><select id="efu_result">'+fuOpts(FU_RESULTS,f.result,true)+'</select></div>'+
+    '<div class="field"><label>下一步计划</label><input id="efu_next" value="'+escapeHtml(f.next_action||"")+'"></div>'+
+    '<div class="form-actions"><button class="btn btn-ghost" onclick="closeObjModal()">取消</button><button class="btn btn-blue" onclick="saveFollowUpEdit('+i+')">保存修改</button></div></div>');
+}
+async function saveFollowUpEdit(i){
+  var f=_followUps[i];
+  f.content=document.getElementById("efu_content").value.trim();
+  f.result=document.getElementById("efu_result").value.trim()||null;
+  f.next_action=document.getElementById("efu_next").value.trim()||null;
+  f.follow_up_type=document.getElementById("efu_type").value;
+  if(!f.content){toast("内容不能为空");return;}
+  try{
+    var body={content:f.content, follow_up_type:f.follow_up_type};
+    if(f.result) body.result=f.result;
+    if(f.next_action) body.next_action=f.next_action;
+    await apiFetch(API+"/follow_ups/"+encodeURIComponent(f.id),{method:"PUT",body:JSON.stringify(body)});
+    closeObjModal();
+    toast("跟进记录已更新 ✓");
+    loadFuTable();
+  }catch(e){toast("更新失败："+e.message);}
+}
+async function showCreateFollowUp(){
+  openObjModal("新建跟进记录",`
+    <div class="form-grid">
+      <div class="field"><label>客户姓名</label><input id="fu_name" placeholder="如 张小明"></div>
+      <div class="field"><label>客户ID<span class="req">*</span></label><input id="fu_ext" placeholder="如 C10001"></div>
+      <div class="field fspan2"><label>跟进类型</label><select id="fu_type">${fuOpts(FU_TYPES,null)}</select></div>
+      <div class="field fspan2"><label>内容<span class="req">*</span></label><textarea id="fu_content" rows="3" style="resize:vertical"></textarea></div>
+      <div class="field"><label>结果</label><select id="fu_result">${fuOpts(FU_RESULTS,null,true)}</select></div>
+      <div class="field"><label>下一步计划</label><input id="fu_next" placeholder="下一步行动（可选）"></div>
+      <div id="fuCustHint" class="fspan2 hint" style="margin-top:-6px"></div>
+      <div class="form-actions"><button class="btn btn-ghost" onclick="closeObjModal()">取消</button><button class="btn btn-blue" onclick="submitCreateFollowUp()">创建跟进记录</button></div>
+    </div>`);
+}
+async function submitCreateFollowUp(){
+  const body={external_id:document.getElementById("fu_ext").value.trim(),follow_up_type:document.getElementById("fu_type").value,content:document.getElementById("fu_content").value.trim(),result:document.getElementById("fu_result").value.trim()||null,next_action:document.getElementById("fu_next").value.trim()||null};
+  if(!body.external_id){toast("请填写客户ID");return;}
+  if(!body.follow_up_type||!body.content){toast("请填写类型和内容");return;}
+  try{
+    await apiFetch(API+"/follow_up",{method:"POST",body:JSON.stringify(body)});
+    toast("跟进已创建 ✓"); closeObjModal(); pageFollowup();
+  }catch(e){toast("创建失败："+e.message);}
+}
+
+/* ===================== 标签管理 ===================== */
+var _allTags=[];
+async function loadCustomerTags(){
+  var kw=document.getElementById("tagCustKw").value.trim();
+  if(!kw){toast("请输入客户姓名、ID或标签名");return;}
+  try{
+    // 先尝试按标签名搜索
+    var tagCusts=await apiFetch(API+"/tags/"+encodeURIComponent(kw)+"/customers").catch(function(){return [];});
+    if(tagCusts&&tagCusts.length>0){
+      document.getElementById("tagCustName").textContent="标签「"+kw+"」关联客户：";
+      var html='<div class="sect">标签匹配结果 ('+tagCusts.length+'个客户)</div><table class="tbl"><thead><tr><th>客户ID</th><th>客户名</th><th>来源</th><th>状态</th></tr></thead><tbody>';
+      tagCusts.forEach(function(c){
+        html+='<tr><td>'+escapeHtml(c.external_id||"—")+'</td><td>'+escapeHtml(c.customer_name||"—")+'</td><td>'+escapeHtml(c.source||"—")+'</td><td>'+(c.confirmed?'<span style="color:var(--green)">已确认</span>':'<span style="color:var(--ink-3)">待确认</span>')+'</td></tr>';
+      });
+      html+='</tbody></table>';
+      document.getElementById("tagCustResult").innerHTML=html;
+      return;
+    }
+    // 回退：按客户名/ID搜索
+    var custs=await apiFetch(API+"/customer_list?keyword="+encodeURIComponent(kw)+"&page_size=5");
+    var items=custs.items||[];
+    if(!items.length){document.getElementById("tagCustResult").innerHTML='<div class="hint">未找到匹配客户或标签，请输入客户姓名/ID 或标签名</div>';return;}
+    var c=items[0];
+    document.getElementById("tagCustName").textContent="当前客户："+(c.name||c.external_id);
+    var j=await apiFetch(API+"/customer_tags/"+encodeURIComponent(c.external_id));
+    var tags=(j&&j.tags)||[];
+    if(!tags.length){document.getElementById("tagCustResult").innerHTML='<div class="hint">该客户暂无标签</div>';return;}
+    var html2='<div class="sect">客户标签</div><table class="tbl"><thead><tr><th>标签ID</th><th>标签名</th><th>来源</th><th>状态</th></tr></thead><tbody>';
+    tags.forEach(function(t){
+      html2+='<tr><td>'+escapeHtml(t.tag_id||"—")+'</td><td>'+escapeHtml(t.tag_name||"—")+'</td><td>'+escapeHtml(t.source||"—")+'</td><td>'+(t.confirmed?'<span style="color:var(--green)">✓ 已确认</span>':'<span style="color:var(--ink-3)">待确认</span>')+'</td></tr>';
+    });
+    html2+='</tbody></table>';
+    document.getElementById("tagCustResult").innerHTML=html2;
+  }catch(e){document.getElementById("tagCustResult").innerHTML='<div style="color:var(--red)">'+escapeHtml(e.message)+'</div>';}
+}
+async function pageTag(){
+  const a=document.getElementById("acontent");
+  a.innerHTML=`<h2>🏷️ 标签管理</h2><div class="sub">标签体系定义 · AI 推荐规则</div>
+    <div class="filters" style="margin-bottom:12px"><input id="tagFilter" placeholder="筛选标签名/ID…" style="width:180px" oninput="renderTagTable()"><input id="tagCustKw" placeholder="输入客户姓名或ID查看其标签" style="width:200px;margin-left:8px"><button class="btn btn-blue btn-sm" onclick="loadCustomerTags()">查看客户标签</button><span id="tagCustName" style="margin-left:8px;font-size:12px;color:var(--ink-2)"></span></div>
+    <div id="tagCustResult" style="margin-bottom:12px"></div>
+    <table class="tbl"><thead><tr><th>标签ID</th><th>标签名</th><th>分组</th><th>AI 规则</th><th>操作</th></tr></thead><tbody id="tagTbody"><tr><td colspan="5">加载中…</td></tr></tbody></table>`;
+  try{
+    const list=await apiFetch(API+"/tags");
+    _allTags=[];
+    if(Array.isArray(list)){
+      list.forEach(function(strategy){
+        (strategy.groups||[]).forEach(function(group){
+          (group.tags||[]).forEach(function(tag){
+            _allTags.push({tag_id:tag.tag_id,tag_name:tag.tag_name,group_id:group.group_id,group_name:group.group_name,ai_rule:tag.ai_rule,sop_template_id:tag.sop_template_id});
+          });
+        });
+      });
+    }
+    renderTagTable();
+  }catch(e){document.getElementById("tagTbody").innerHTML=`<tr><td colspan="5" style="color:var(--red)">${escapeHtml(e.message)}</td></tr>`;}
+}
+function renderTagTable(){
+  var filterEl=document.getElementById("tagFilter");
+  var kw=(filterEl&&filterEl.value||"").trim().toLowerCase();
+  var filtered=kw?_allTags.filter(function(t){
+    return (t.tag_id||"").toLowerCase().indexOf(kw)>=0||(t.tag_name||"").toLowerCase().indexOf(kw)>=0||(t.group_name||"").toLowerCase().indexOf(kw)>=0;
+  }):_allTags;
+  document.getElementById("tagTbody").innerHTML=filtered.length?filtered.map(function(t,i){
+    var origIdx=_allTags.indexOf(t);
+    return '<tr><td>'+escapeHtml(t.tag_id||"")+'</td><td>'+escapeHtml(t.tag_name||"")+'</td><td>'+escapeHtml(t.group_name||t.group_id||"—")+'</td><td style="font-size:11px;color:var(--ink-2)">'+escapeHtml(t.ai_rule||"—")+'</td><td><button class="btn btn-ghost btn-sm" onclick="viewTagCustomers('+origIdx+')">查看客户</button> <button class="btn btn-ghost btn-sm" onclick="editTag('+origIdx+')">编辑</button> <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteTag('+origIdx+')">删除</button></td></tr>';
+  }).join(""):'<tr><td colspan="5" class="hint">暂无标签</td></tr>';
+}
+async function viewTagCustomers(idx){
+  var t=_allTags[idx];
+  if(!t)return;
+  var tagId=t.tag_id; var tagName=t.tag_name||tagId;
+  var div=document.getElementById("tagCustResult");
+  div.innerHTML='<div class="hint">加载中…</div>';
+  try{
+    var customers=await apiFetch(API+"/tags/"+encodeURIComponent(tagId)+"/customers");
+    if(!customers||!customers.length){div.innerHTML='<div class="hint">标签「'+escapeHtml(tagName)+'」暂无关联客户</div>';return;}
+    var html='<div class="sect">标签「'+escapeHtml(tagName)+'」关联客户 ('+customers.length+')</div><table class="tbl"><thead><tr><th>客户ID</th><th>客户名</th><th>来源</th><th>状态</th><th>操作</th></tr></thead><tbody>';
+    customers.forEach(function(c){
+      html+='<tr><td>'+escapeHtml(c.external_id||"—")+'</td><td>'+escapeHtml(c.customer_name||"—")+'</td><td>'+escapeHtml(c.source||"—")+'</td><td>'+(c.confirmed?'<span style="color:var(--green)">已确认</span>':'<span style="color:var(--ink-3)">待确认</span>')+'</td><td><button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="removeTagCustomer(\''+escapeHtml(tagId)+'\',\''+escapeHtml(c.external_id||"")+'\')">移除</button></td></tr>';
+    });
+    html+='</tbody></table>';
+    div.innerHTML=html;
+  }catch(e){div.innerHTML='<div style="color:var(--red)">'+escapeHtml(e.message)+'</div>';}
+}
+async function removeTagCustomer(tagId, externalId){
+  if(!confirm("确认将该客户从此标签移除？"))return;
+  try{
+    await apiFetch(API+"/tags/"+encodeURIComponent(tagId)+"/customers/"+encodeURIComponent(externalId),{method:"DELETE"});
+    toast("已移除该客户 ✓");
+    var idx=_allTags.findIndex(function(x){return x.tag_id===tagId;});
+    if(idx>=0)viewTagCustomers(idx);
+  }catch(e){toast("移除失败："+e.message);}
+}
+function editTag(i){
+  var t=_allTags[i];
+  if(!t)return;
+  openObjModal("编辑标签："+escapeHtml(t.tag_name),
+    '<div class="form-grid">'+
+    '<div class="field"><label>标签ID</label><input id="etag_id" value="'+escapeHtml(t.tag_id)+'" readonly></div>'+
+    '<div class="field"><label>标签名<span class="req">*</span></label><input id="etag_name" value="'+escapeHtml(t.tag_name)+'"></div>'+
+    '<div class="field fspan2"><label>AI 规则</label><input id="etag_rule" value="'+escapeHtml(t.ai_rule||"")+'"></div>'+
+    '<div class="form-actions"><button class="btn btn-ghost" onclick="closeObjModal()">取消</button><button class="btn btn-blue" onclick="saveTagEdit(\''+i+'\')">保存修改</button></div></div>');
+}
+async function saveTagEdit(i){
+  var t=_allTags[i];
+  var name=document.getElementById("etag_name").value.trim();
+  var rule=document.getElementById("etag_rule").value.trim();
+  if(!name){toast("标签名不能为空");return;}
+  try{
+    var body={tag_name:name};
+    if(rule) body.ai_rule=rule;
+    await apiFetch(API+"/tags/"+encodeURIComponent(t.tag_id),{method:"PUT",body:JSON.stringify(body)});
+    closeObjModal();
+    toast("标签已更新 ✓");
+    pageTag();
+  }catch(e){toast("更新失败："+e.message);}
+}
+async function deleteTag(i){
+  var t=_allTags[i];
+  if(!t||!confirm("确认删除标签 "+escapeHtml(t.tag_name)+"？"))return;
+  try{
+    await apiFetch(API+"/tags/"+encodeURIComponent(t.tag_id),{method:"DELETE"});
+    toast("标签已删除 ✓");
+    pageTag();
+  }catch(e){toast("删除失败："+e.message);}
+}
+
+/* ===================== 权限与角色 ===================== */
+async function pagePermOrg(){
+  const a=document.getElementById("acontent");
+  let roles=[];try{const r=await apiFetch(API+"/roles");roles=Array.isArray(r)?r:(r.items||[]);}catch(_){}
+  a.innerHTML=`<h2>🔐 权限与组织</h2><div class="sub">三级角色体系 · 组织架构 · 企微账户（权限：${CUR_ADMIN.data_scope}）</div>
+    <div class="sect">权限矩阵</div>
+    <table class="permmatrix"><thead><tr><th>能力</th><th>超级管理员</th><th>区域主管</th><th>普通顾问</th></tr></thead><tbody>
+      <tr><td>AI 侧边栏使用</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td>客户画像查看（名下）</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td>数据看板（全集团）</td><td class="yes">✓</td><td class="no">✗（仅本区域）</td><td class="no">✗</td></tr>
+      <tr><td>员工 / 权限配置</td><td class="yes">✓</td><td class="no">✗</td><td class="no">✗</td></tr>
+      <tr><td>标签体系与 SOP 配置</td><td class="yes">✓</td><td class="yes">✓（本区域）</td><td class="no">✗</td></tr>
+      <tr><td>AI 采纳率报表</td><td class="yes">✓（全员）</td><td class="yes">✓（本区域）</td><td class="no">✗</td></tr>
+    </tbody></table>
+    <div class="sect">系统角色定义</div>
+    <table class="tbl"><thead><tr><th>code</th><th>名称</th><th>data_scope</th><th>描述</th></tr></thead><tbody>${roles.map(r=>`<tr><td>${escapeHtml(r.role_code)}</td><td>${escapeHtml(r.role_name)}</td><td><span class="status s-ai">${escapeHtml(r.data_scope)}</span></td><td style="font-size:11px;color:var(--ink-2)">${escapeHtml(r.description||"—")}</td></tr>`).join("")}</tbody></table>
+    <div class="sect">组织架构 / 企微账户</div>
+    <div class="grid2">
+      <div class="box"><h3>组织架构（organizations）</h3><div id="orgDiv">加载中…</div></div>
+      <div class="box"><h3>企微账户（wework_accounts）</h3><div id="wwDiv">加载中…</div></div>
+    </div>
+    <div class="sect">隐私与安全合规（5.2）</div>
+    <div class="box"><div class="kv"><span class="k">数据脱敏</span><span class="v">历史聊天样本脱敏后用于 AI 训练（N8）</span></div>
+      <div class="kv"><span class="k">访问控制</span><span class="v">客户信息访问权限严格（N6）</span></div>
+      <div class="kv"><span class="k">未成年人保护</span><span class="v">最小必要原则，符合《个保法》（N9）</span></div>
+      <div class="kv"><span class="k">数据所有权</span><span class="v">数据归甲方，仅用于本系统（N10）</span></div>
+      <div class="kv"><span class="k">AI 服务隔离</span><span class="v">AI 独立部署，异常不影响企微主流程（N11/N19）</span></div></div>`;
+  try{
+    const o=await apiFetch(API+"/organizations");
+    const items=Array.isArray(o)?o:(o.items||[]);
+    document.getElementById("orgDiv").innerHTML=items.length?("<div style='display:flex;flex-direction:column;gap:8px'>"+items.map(x=>`<div style="padding:10px 12px;background:#fff;border-radius:8px;border:1px solid var(--line)"><div style="font-weight:600;margin-bottom:4px">${escapeHtml(x.org_name||"—")}</div><div style="font-size:11px;color:var(--ink-2);display:flex;gap:16px;flex-wrap:wrap"><span>类型：${escapeHtml(x.org_type||"—")}</span><span>企微账户：${escapeHtml(x.wework_account_id||"—")}</span><span>上级组织：${escapeHtml(x.parent_org_id||"—")}</span></div></div>`).join("")+"</div>"):"<div class='hint'>暂无组织</div>";
+  }catch(e){document.getElementById("orgDiv").innerHTML=escapeHtml(e.message);}
+  try{
+    const w=await apiFetch(API+"/wework_accounts");
+    const items=Array.isArray(w)?w:(w.items||[]);
+    document.getElementById("wwDiv").innerHTML=items.length?("<table class='tbl'><thead><tr><th>account_id</th><th>名称</th><th>区域</th><th>启用</th></tr></thead><tbody>"+items.map(x=>`<tr><td>${escapeHtml(x.account_id||"")}</td><td>${escapeHtml(x.account_name||"")}</td><td>${escapeHtml(x.region||"—")}</td><td><span class="status ${x.is_active?"s-ok":"s-off"}">${x.is_active?"启用":"停用"}</span></td></tr>`).join("")+"</tbody></table>"):"<div class='hint'>暂无账户</div>";
+  }catch(e){document.getElementById("wwDiv").innerHTML=escapeHtml(e.message);}
+}
+
+
+/* ===================== 日程管理 ===================== */
+var _schedData=[]; var _calYear,_calMonth,_calSelected;
+async function pageSchedule(){
+  const a=document.getElementById("acontent");
+  var now=new Date();
+  _calYear=now.getFullYear(); _calMonth=now.getMonth()+1; _calSelected=null;
+  a.innerHTML=`<h2>📅 日程管理</h2><div class="sub">日历视图 · 点击日期查看当天日程（权限：${CUR_ADMIN.data_scope}）</div>
+    <div class="cal-nav"><button class="btn btn-ghost btn-sm" onclick="navCal(-1)">◀</button><span class="mn" id="calLabel"></span><button class="btn btn-ghost btn-sm" onclick="navCal(1)">▶</button></div>
+    <table class="calendar"><thead><tr><th>日</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th></tr></thead><tbody id="calBody"></tbody></table>
+    <div id="dayDetail" class="day-detail"><div class="hint">点击日历中的日期查看当天日程安排</div></div>`;
+  await loadSchedData();
+}
+async function loadSchedData(){
+  try{
+    const j=await apiFetch(API+"/schedules");
+    _schedData=(j.items||[]);
+    renderCalendar();
+  }catch(e){document.getElementById("calBody").innerHTML='<tr><td colspan="7" style="color:var(--red)">'+escapeHtml(e.message)+'</td></tr>';}
+}
+function navCal(dir){
+  _calMonth+=dir;
+  if(_calMonth<1){_calMonth=12;_calYear--;}
+  if(_calMonth>12){_calMonth=1;_calYear++;}
+  _calSelected=null;
+  document.getElementById("dayDetail").innerHTML='<div class="hint">点击日历中的日期查看当天日程安排</div>';
+  renderCalendar();
+}
+function renderCalendar(){
+  document.getElementById("calLabel").textContent=_calYear+'年'+_calMonth+'月';
+  var today=new Date(); var todayStr=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+  var map={};
+  _schedData.forEach(function(s){
+    var d=(s.start_time||"").slice(0,10);
+    if(d){if(!map[d])map[d]=[]; map[d].push(s);}
+  });
+  var firstDay=new Date(_calYear,_calMonth-1,1);
+  var startDow=firstDay.getDay();
+  var daysInMonth=new Date(_calYear,_calMonth,0).getDate();
+  var prevDays=new Date(_calYear,_calMonth-1,0).getDate();
+  var cells=[];
+  for(var i=startDow-1;i>=0;i--){
+    var d=prevDays-i;
+    var m=_calMonth-1||12; var y=m===12?_calYear-1:_calYear;
+    var ds=y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    cells.push({day:d,dateStr:ds,other:true});
+  }
+  for(var d=1;d<=daysInMonth;d++){
+    var ds=_calYear+'-'+String(_calMonth).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    cells.push({day:d,dateStr:ds,other:false});
+  }
+  var remaining=7-(cells.length%7||7);
+  if(remaining<7){
+    for(var d=1;d<=remaining;d++){
+      var m=_calMonth+1; var y=_calYear; if(m>12){m=1;y++;}
+      var ds=y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+      cells.push({day:d,dateStr:ds,other:true});
+    }
+  }
+  var rows=[];
+  for(var i=0;i<cells.length;i+=7){rows.push(cells.slice(i,i+7));}
+  var html='';
+  rows.forEach(function(row){
+    html+='<tr>';
+    row.forEach(function(c){
+      var hasEvents=!!map[c.dateStr];
+      var hasHi=hasEvents&&map[c.dateStr].some(function(s){return s.priority==='高';});
+      var cls=[];
+      if(c.other)cls.push('other');
+      if(c.dateStr===todayStr)cls.push('today');
+      if(c.dateStr===_calSelected)cls.push('selected');
+      var dots='';
+      if(hasEvents&&!c.other){
+        dots='<div class="dots">'+map[c.dateStr].slice(0,3).map(function(s){return '<span class="dot'+(s.priority==='高'?' hi':'')+'"></span>';}).join('')+'</div>';
+      }
+      html+='<td class="'+cls.join(' ')+'"'+(c.other?'':' onclick="showDayScheds(\''+c.dateStr+'\')"')+'><span class="dnum">'+c.day+'</span>'+dots+'</td>';
+    });
+    html+='</tr>';
+  });
+  document.getElementById("calBody").innerHTML=html;
+}
+function showDayScheds(dateStr){
+  _calSelected=dateStr;
+  renderCalendar();
+  var items=_schedData.filter(function(s){return (s.start_time||"").slice(0,10)===dateStr;});
+  var div=document.getElementById("dayDetail");
+  if(items.length===0){
+    div.innerHTML='<h3>'+dateStr+'</h3><div class="hint">当天暂无日程安排</div>';
+    return;
+  }
+  var prioMap={'高':'🔴 高','中':'🟡 中','低':'🟢 低'};
+  div.innerHTML='<h3>'+dateStr+' · '+items.length+' 项日程</h3>'+items.map(function(s){
+    var status=s.status||'待确认';
+    var stCls=status==='已确认'?'s-ok':(status==='已取消'?'s-off':'s-wait');
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line)"><div><strong>'+escapeHtml(s.title||'—')+'</strong><div class="hint" style="margin-top:2px">'+escapeHtml(s.customer_name||'—')+' · '+escapeHtml(s.external_id||'')+'</div></div><div style="text-align:right"><span class="status '+stCls+'">'+escapeHtml(status)+'</span><div class="hint" style="margin-top:2px">'+(prioMap[s.priority]||s.priority||'—')+'</div><div class="hint">'+escapeHtml(fmtDate(s.start_time))+' — '+escapeHtml(fmtDate(s.end_time))+'</div></div></div>';
+  }).join('');
+}
+/* ===================== 通用 Modal ===================== */
+function openObjModal(title,html,size){
+  var mask=document.getElementById("objModal");
+  var modal=mask.querySelector(".modal");
+  modal.className="modal"+(size==="lg"?" modal-lg":"");
+  document.getElementById("objModalTitle").textContent=title;
+  document.getElementById("objModalBody").innerHTML=html;
+  mask.classList.add("open");
+}
+function closeObjModal(){document.getElementById("objModal").classList.remove("open");}
+
+/* ===================== 启动 ===================== */
+document.getElementById("loginPass").addEventListener("keydown",e=>{if(e.key==="Enter")doLogin();});
+document.getElementById("loginUser").addEventListener("keydown",e=>{if(e.key==="Enter")document.getElementById("loginPass").focus();});
+// 启动时尝试 /me
+(async ()=>{
+  try{
+    const r=await fetch(API+"/me",{credentials:"include"});
+    const j=await r.json();
+    if(r.ok&&j.success){
+      CUR_ADMIN={user_id:j.data.user_id,name:j.data.name,data_scope:j.data.data_scope,role_codes:j.data.role_codes||[]};
+      document.getElementById("loginOverlay").style.display="none";
+      document.getElementById("userInfoBox").style.display="flex";
+      document.getElementById("loggedUser").textContent=`${CUR_ADMIN.name}（${CUR_ADMIN.user_id}）`;
+      const badge=document.getElementById("permBadge");
+      const [cls,label]=permBadgeFor(CUR_ADMIN.data_scope);
+      badge.className="permission-badge "+cls;badge.textContent=label;badge.style.display="inline";
+      adminPage("dash");
+    }
+  }catch(_){}
+})();
+</script>
+</body>
+</html>
