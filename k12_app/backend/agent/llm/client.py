@@ -48,6 +48,55 @@ def get_llm_client() -> OpenAI:
 # 核心调用函数
 # ============================================================
 
+def _complete_with_fallback(client, model_name: str, messages: List[Dict[str, str]],
+                            temperature: float, max_tokens: Optional[int],
+                            extra_kwargs: Optional[Dict] = None) -> str:
+    """
+    调用 LLM 并处理推理模型（deepseek-v4-flash）的 content 空返回问题（V3.3.2）：
+
+    该模型偶发把完整回答放进 message.reasoning_content 而 message.content 为空。
+    不能直接把 reasoning_content 当答案返回——它通常是思考过程（含噪音），
+    正确做法：用思考内容作为上下文引导模型再生成一次最终回复（最多重试 1 次）。
+    """
+    extra_kwargs = extra_kwargs or {}
+    try:
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            **extra_kwargs,
+        )
+    except Exception as e:
+        logger.error(f"LLM 调用失败: {e}")
+        raise
+
+    message = response.choices[0].message
+    result = message.content or ""
+
+    if not result:
+        reasoning = getattr(message, "reasoning_content", None) or ""
+        logger.info(f"LLM 返回空 content，reasoning_content 长度={len(reasoning)}，引导重试一次")
+        if reasoning:
+            try:
+                retry_messages = list(messages) + [
+                    {"role": "assistant", "content": reasoning},
+                    {"role": "user",
+                     "content": "请直接输出最终回复内容本身，不要包含任何思考、分析或说明。"},
+                ]
+                resp2 = client.chat.completions.create(
+                    model=model_name,
+                    messages=retry_messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    **extra_kwargs,
+                )
+                result = resp2.choices[0].message.content or ""
+            except Exception as e:
+                logger.warning(f"LLM 重试失败: {e}")
+    return result
+
+
 def call_llm(
     system_prompt: str,
     user_content: str,
@@ -81,24 +130,19 @@ def call_llm(
     if reasoning_effort is not None:
         extra_kwargs["reasoning_effort"] = reasoning_effort
 
-    try:
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_content},
-            ],
-            temperature=temperature,
-            max_tokens=max_tokens,
-            **extra_kwargs,
-        )
-        result = response.choices[0].message.content
-        logger.debug(f"LLM 调用成功，输出长度: {len(result)} 字符")
-        return result
-
-    except Exception as e:
-        logger.error(f"LLM 调用失败: {e}")
-        raise
+    result = _complete_with_fallback(
+        client=client,
+        model_name=model_name,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ],
+        temperature=temperature,
+        max_tokens=max_tokens,
+        extra_kwargs=extra_kwargs,
+    )
+    logger.debug(f"LLM 调用成功，输出长度: {len(result)} 字符")
+    return result
 
 
 def chat_completion(
@@ -108,7 +152,7 @@ def chat_completion(
     model: Optional[str] = None,
 ) -> str:
     """
-    多轮对话调用（用于 free_chat 自由对话）
+    多轮对话调用（用于 free_chat 自由对话 / 模拟家长等）
 
     Args:
         messages: 消息列表 [{"role": "system"|"user"|"assistant", "content": "..."}]
@@ -132,20 +176,15 @@ def chat_completion(
     model_name = model or DEFAULT_MODEL
     client = get_llm_client()
 
-    try:
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
-        result = response.choices[0].message.content
-        logger.debug(f"对话调用成功，输出长度: {len(result)} 字符")
-        return result
-
-    except Exception as e:
-        logger.error(f"对话调用失败: {e}")
-        raise
+    result = _complete_with_fallback(
+        client=client,
+        model_name=model_name,
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+    logger.debug(f"对话调用成功，输出长度: {len(result)} 字符")
+    return result
 
 
 # ============================================================

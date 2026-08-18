@@ -69,6 +69,56 @@ def extract_json_list(text: str) -> Optional[list]:
 
 
 # ============================================================
+# JSON 修复（LLM 偶发截断/损坏时基于原文修复补全）
+# ============================================================
+
+REPAIR_JSON_SYSTEM_PROMPT = """你是一个 JSON 修复助手。用户会给你一段不完整、被截断或包含多余文字的 JSON。
+请将其修复为完整合法的 JSON，并只输出修复后的 JSON 本身：
+- 不要输出 markdown 代码块标记（```）
+- 不要输出任何解释、前言或后记
+- 数组型数据输出 JSON 数组，对象型数据输出 JSON 对象
+- 内容缺失无法推断的字段用 null 或合理默认值补全，不要编造超出原文的信息
+- 如果原文完全无法修复，只输出 null"""
+
+
+def repair_json_with_llm(
+    text: str,
+    expect_list: bool = False,
+    max_tokens: int = 2000,
+) -> Optional[Any]:
+    """
+    用 LLM 修复/补全截断或损坏的 JSON（缓解中文场景 max_tokens 截断问题）。
+
+    延迟导入 client 避免循环依赖（client.py → utils.py → client.py）。
+
+    Args:
+        text: LLM 原始响应（可能被截断/含多余文字）
+        expect_list: True 期望数组，False 期望对象
+        max_tokens: 修复调用最大输出 token 数
+
+    Returns:
+        修复后的 dict/list，失败返回 None
+    """
+    if not text or not text.strip():
+        return None
+    from k12_app.backend.agent.llm.client import call_llm  # 延迟导入
+    try:
+        raw = call_llm(
+            REPAIR_JSON_SYSTEM_PROMPT,
+            f"需要修复的 JSON（可能被截断或包含多余文字）：\n```\n{text[:6000]}\n```",
+            temperature=0.0,
+            max_tokens=max_tokens,
+        )
+        result = extract_json(raw, expect_list)
+        if result is not None:
+            logger.info(f"LLM JSON 修复成功（expect_list={expect_list}）")
+        return result
+    except Exception as e:
+        logger.warning(f"LLM JSON 修复失败: {e}")
+        return None
+
+
+# ============================================================
 # 数据清洗
 # ============================================================
 

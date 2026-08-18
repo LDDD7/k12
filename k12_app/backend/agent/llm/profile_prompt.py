@@ -8,7 +8,9 @@ import logging
 from typing import List, Dict, Any, Optional
 
 from k12_app.backend.agent.llm.client import call_llm
-from k12_app.backend.agent.llm.utils import clean_data_for_json, extract_json_list, format_retrieved_messages
+from k12_app.backend.agent.llm.utils import (
+    clean_data_for_json, extract_json_list, format_retrieved_messages, repair_json_with_llm,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +99,7 @@ def generate_profile(
         user_content += f"\n【历史聊天记录（向量库检索，该客户过往对话）】\n{retrieved_text}\n"
 
     # 3. 调用 LLM，最多重试 2 次（缓解偶发空响应/超时导致的 500）
+    #    每次解析失败先尝试 LLM 修复截断的 JSON，再重新生成（问题 5 修复）
     last_error = ""
     for attempt in range(1, 3):
         try:
@@ -105,6 +108,10 @@ def generate_profile(
                 max_tokens=2000, reasoning_effort="low",
             )
             data = extract_json_list(raw_response)
+
+            if not data:
+                logger.warning(f"画像生成返回无效 JSON（第 {attempt} 次），尝试 LLM 修复: {raw_response[:120]}")
+                data = repair_json_with_llm(raw_response, expect_list=True, max_tokens=2000)
 
             if data and isinstance(data, list):
                 valid_items = [item for item in data if _validate_item(item)]

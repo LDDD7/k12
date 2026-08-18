@@ -115,6 +115,36 @@ main{max-width:1280px;margin:0 auto;padding:14px}
 .sugg .acts .btn{flex:1;text-align:center;padding:6px 0;font-size:12px}
 .sugg.adopted{opacity:.55}
 .sugg.adopted::after{content:"已采纳";position:absolute;top:8px;right:10px;font-size:10px;color:var(--green)}
+/* 二期：综合推理步骤透明展示 */
+.reasoning-trigger{background:linear-gradient(135deg,#EEF4FF,#F5F0FF);border:1px dashed var(--blue);border-radius:10px;padding:10px 12px;margin-top:6px;margin-bottom:10px}
+.reasoning-trigger .btn{font-size:13px;padding:9px 0}
+.reasoning-steps{margin-top:6px}
+.rstep{background:#fff;border:1px solid var(--line);border-left:3px solid var(--blue);border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:12px;line-height:1.6}
+.rstep .rs-head{display:flex;align-items:center;gap:6px;font-weight:600;color:var(--ink)}
+.rstep .rs-head .rs-ico{width:18px;height:18px;border-radius:50%;background:var(--blue);color:#fff;font-size:10px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.rstep .rs-head .rs-desc{flex:1}
+.rstep .rs-status{font-size:10px;padding:2px 8px;border-radius:8px}
+.rstep .rs-status.run{background:var(--purple-light);color:var(--purple)}
+.rstep .rs-status.done{background:#EAF9F0;color:var(--green)}
+.rstep .rs-status.err{background:#FDE7E9;color:var(--red)}
+.rstep .rs-text{color:var(--ink-2);margin-top:6px;white-space:pre-wrap;word-break:break-all;max-height:120px;overflow:auto}
+.rstep .rs-meta{font-size:10px;color:var(--ink-3);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap}
+.rstep .rs-meta .src-tag{background:var(--purple-light);color:var(--purple);padding:1px 6px;border-radius:6px}
+.rstep .rs-meta .miss-tag{background:#FFF4E5;color:#B86D00;padding:1px 6px;border-radius:6px}
+.reasoning-result{margin-top:10px}
+.rr-sugg{background:#fff;border:1px solid var(--line);border-left:3px solid var(--orange);border-radius:10px;padding:12px;margin-bottom:10px}
+.rr-sugg .head{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.rr-sugg .ai-tag{font-size:10px;color:var(--orange);background:#FFF4E5;padding:2px 8px;border-radius:8px;font-weight:600}
+.rr-sugg .body{font-size:13px;line-height:1.7}
+.rr-sugg .sources{font-size:11px;color:var(--ink-3);margin-top:8px;border-top:1px dashed var(--line);padding-top:6px;line-height:1.6}
+.rr-sugg .sources b{color:var(--purple)}
+.rr-sugg .acts{display:flex;gap:8px;margin-top:8px}
+.rr-sugg .acts .btn{flex:1;text-align:center;padding:6px 0;font-size:12px}
+.rr-sugg .fb-row{display:flex;gap:6px;margin-top:8px;align-items:center}
+.rr-sugg .fb-row .fb-btn{font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--line);background:#fff;color:var(--ink-2);cursor:pointer}
+.rr-sugg .fb-row .fb-btn:hover{border-color:var(--blue);color:var(--blue)}
+.rr-sugg .fb-row .fb-btn.on{background:#EAF9F0;color:var(--green);border-color:var(--green)}
+.rr-note{font-size:10px;color:var(--ink-3);margin-top:6px;line-height:1.6}
 .tagin{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#fff;border:1px solid var(--line);border-radius:10px;margin-bottom:8px}
 .tagin .tg{font-size:12px;font-weight:600;background:var(--blue);color:#fff;padding:3px 10px;border-radius:8px;white-space:nowrap}
 .tagin .tg.plus{background:#07C160}.tagin .tg.minus{background:var(--ink-3)}.tagin .tg.confirmed{background:var(--green)}
@@ -228,6 +258,7 @@ main{max-width:1280px;margin:0 auto;padding:14px}
       <div class="sbtabs">
         <button class="active" data-tab="profile" onclick="sbTab('profile')">客户画像</button>
         <button data-tab="reply" onclick="sbTab('reply')">回复建议</button>
+        <button data-tab="reasoning" onclick="sbTab('reasoning')">综合推理</button>
         <button data-tab="tag" onclick="sbTab('tag')">智能标签</button>
         <button data-tab="todo" onclick="sbTab('todo')">日程提醒</button>
       </div>
@@ -235,6 +266,14 @@ main{max-width:1280px;margin:0 auto;padding:14px}
         <div class="loading" id="sbLoading"><div class="sp"></div>AI 分析中…</div>
         <div class="sb-pane active" id="pane-profile"><div class="hint" style="padding:24px">选定客户后点击「分析」或发送任意消息即可触发 AI 画像生成。</div></div>
         <div class="sb-pane" id="pane-reply"><div class="hint" style="padding:24px">选择客户后 AI 将基于最近聊天内容自动生成回复建议。</div></div>
+        <div class="sb-pane" id="pane-reasoning">
+          <div class="reasoning-trigger">
+            <button class="btn btn-blue btn-block" id="reasoningBtn" onclick="triggerReasoning()">🔍 手动综合推理</button>
+            <div class="hint" style="margin-top:6px">自动读取最近一条家长消息（或输入框内容），AI 像资深顾问一样分步查证：查画像 → 匹配课程 → 核对价格政策 → 综合给出带来源标注的建议。</div>
+          </div>
+          <div class="reasoning-steps" id="reasoningSteps"></div>
+          <div class="reasoning-result" id="reasoningResult" style="display:none"></div>
+        </div>
         <div class="sb-pane" id="pane-tag"><div class="hint" style="padding:24px">选定客户后加载当前标签与 AI 推荐草稿。</div></div>
         <div class="sb-pane" id="pane-todo"><div class="hint" style="padding:24px">选定客户后加载日程提醒。</div></div>
       </div>
@@ -378,7 +417,7 @@ function afterLogin(){
 }
 function showBindingGuide(){
   document.getElementById("chanList").innerHTML=`<div class="no-access"><div class="icon">🔗</div><b>尚未绑定企业微信账户</b><br><span style="font-size:11px">V3.2 引导绑定页 · 请联系管理员绑定企微账户后重新登录。</span></div>`;
-  document.getElementById("msgList").innerHTML=`<div class="binding-card"><div class="ico">🔗</div><h2>欢迎，${CUR_USER.name}</h2><p>您的账号当前未绑定企业微信账户。<br>请完成企业微信绑定后重新登录，即可使用 AI 销售辅助侧边栏。<br><br>（可让管理员通过 <code>POST /api/admin/bind_wework</code> 接口为您完成绑定，或登录其它已绑定账号继续使用。）</p><button class="btn btn-ghost" onclick="doLogout()">返回登录</button></div>`;
+  document.getElementById("msgList").innerHTML=`<div class="binding-card"><div class="ico">🔗</div><h2>欢迎，${escapeHtml(CUR_USER.name)}</h2><p>您的账号当前未绑定企业微信账户。<br>请完成企业微信绑定后重新登录，即可使用 AI 销售辅助侧边栏。<br><br>（可让管理员通过 <code>POST /api/admin/bind_wework</code> 接口为您完成绑定，或登录其它已绑定账号继续使用。）</p><button class="btn btn-ghost" onclick="doLogout()">返回登录</button></div>`;
   toast("该账号未绑定企微账户");
 }
 
@@ -411,7 +450,7 @@ function renderChans(){
     const st=escapeHtml((c.stage||"").slice(0,4));
     const sub=[c.grade,c.focus_subject].filter(Boolean).join("·");
     const last=c.last_msg?escapeHtml(c.last_msg):(c.remark?escapeHtml(c.remark):"—");
-    return `<div class="chan ${cls}" onclick="switchChan('${c.external_id}')">
+    return `<div class="chan ${cls}" onclick="switchChan('${jsStr(c.external_id)}')">
       <div class="avatar ${colorByName(c.name)}">${avatarChar(c.name)}</div>
       <div style="flex:1;min-width:0">
         <div class="name">${escapeHtml(c.name||"")} <span class="stage">${st}</span></div>
@@ -426,6 +465,7 @@ function formatShortTime(t){
   const now=new Date(); const s=d.toLocaleString("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}); return s;
 }
 function escapeHtml(s){if(s==null)return"";return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));}
+function jsStr(s){if(s==null)return"";return String(s).replace(/["'&<>\\\r\n]/g,function(m){if(m==='"')return"\\x22";if(m==="'")return"\\x27";if(m==="&")return"\\x26";if(m==="<")return"\\x3c";if(m===">")return"\\x3e";if(m==="\\")return"\\\\";return"\\n";});}
 
 /* ===================== 切换会话 ===================== */
 async function switchChan(ext){
@@ -437,7 +477,7 @@ async function switchChan(ext){
   document.getElementById("chatAvatar").className="avatar "+colorByName(curCust.name);
   const who=curCust.child_name?`${curCust.name}（${curCust.child_name}家长）`:curCust.name;
   document.getElementById("chatWho").textContent=who;
-  document.getElementById("chatHint").textContent=[curCust.grade,curCust.focus_subject,curCust.remark].filter(Boolean).join(" · ");
+  document.getElementById("chatHint").textContent="";
   startProfileStream();
   await Promise.all([loadHistory(), loadProfile(), loadTags(), loadSchedules()]);
   autoGenerateReplies();
@@ -470,16 +510,32 @@ async function loadHistory(){
 }
 async function refreshChat(){
   if(!curExt){toast("请先选择客户");return;}
+  // V3.3.2：清空弹窗选择范围（仅聊天记录 / 彻底重置 AI 记忆）
+  document.getElementById("sourceTitle").textContent="清空与重置";
+  document.getElementById("sourceBody").innerHTML=`
+    <p class="hint">请选择清空范围：</p>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+      <button class="btn btn-ghost btn-block" onclick="doClearChat(false)">仅清空聊天记录</button>
+      <button class="btn btn-primary btn-block" onclick="doClearChat(true)">彻底重置（聊天 + AI 画像 + 标签）</button>
+    </div>
+    <p class="hint" style="margin-top:12px">「彻底重置」将删除该客户的 AI 画像与标签，AI 不再记得该客户情况（订单等业务数据保留）。</p>`;
+  document.getElementById("sourceModal").classList.add("open");
+}
+async function doClearChat(resetMemory){
+  closeSourceModal();
+  if(resetMemory && !confirm("彻底重置将删除该客户的聊天记录、AI 画像与标签，AI 将不再记得该客户。是否继续？"))return;
   try{
-    await asyncFetch(API+"/clear_chat",{method:"POST",body:JSON.stringify({external_id:curExt})});
+    const j=await asyncFetch(API+"/clear_chat",{method:"POST",body:JSON.stringify({external_id:curExt,reset_memory:resetMemory})});
     chatHistory=[];
     _lastReplies=[];
     adoptedReplies[curExt]={};
     copiedSuggestion=null;
     renderChat();
     document.getElementById("pane-reply").innerHTML="<div class='hint' style='padding:24px'>选择客户后 AI 将基于最近聊天内容自动生成回复建议。</div>";
-    toast("已清空聊天记录");
-  }catch(e){toast("清空聊天记录失败："+e.message);}
+    document.getElementById("pane-profile").innerHTML="<div class='hint' style='padding:24px'>选定客户后点击「分析」或发送任意消息即可触发 AI 画像生成。</div>";
+    resetReasoningUI();
+    toast(resetMemory?"已彻底重置，AI 记忆已清除 ✓":"已清空聊天记录 ✓");
+  }catch(e){toast("清空失败："+e.message);}
 }
 function renderChat(){
   const el=document.getElementById("msgList");
@@ -524,6 +580,8 @@ async function simulateParent(){
       chatHistory.push(parentMsg);
       renderChat();
       document.getElementById("msgList").scrollTop=document.getElementById("msgList").scrollHeight;
+    }else{
+      toast("AI 模拟家长暂无回复，请稍后再试");
     }
   }catch(e){toast("AI 模拟家长失败："+e.message);}
   btn.disabled=false; btn.textContent="🤖";
@@ -548,20 +606,23 @@ async function sendMsg(){
   }
   await streamSendMessage(v);
 }
-async function streamSendMessage(message){
+async function streamSendMessage(message, menuId){
   aiBusy=true; setSending(true);
   document.getElementById("sbLoading").classList.add("show");
-  document.getElementById("aiSub").textContent="AI 实时分析中…";
+  document.getElementById("aiSub").textContent=menuId==="reasoning_suggestion"?"AI 综合推理中…":"AI 实时分析中…";
   var useMock = false;
   try{
+    var body={message:message,external_id:curExt,wework_account_id:CUR_USER.wework_account_id};
+    if(menuId) body.menu_id=menuId;   // V3.3.1：手动综合推理按钮强制意图
     var resp=await fetch(API+"/send_message",{
       method:"POST",
       headers:{"Content-Type":"application/json","Authorization":"Bearer "+TOKEN,"Accept":"text/event-stream"},
-      body:JSON.stringify({message:message,external_id:curExt,wework_account_id:CUR_USER.wework_account_id})
+      body:JSON.stringify(body)
     });
     if(!resp.ok||!resp.body){var t=await resp.text();throw new Error(t||"send_message 失败");}
     var reader=resp.body.getReader(); var dec=new TextDecoder("utf-8"); var buf="";
-    var intent=null,taskResult=null;
+    var intent=null,taskResult=null,lastTaskLogId=null;
+    resetReasoningUI();
     while(true){
       var readResult=await reader.read();
       if(readResult.done)break;
@@ -575,6 +636,8 @@ async function streamSendMessage(message){
         if(!data)continue;
         var dt=data.type;
         if(dt==="node_result"){ document.getElementById("aiSub").textContent=(data.message||data.status||"")+" · "+(data.node_name||""); }
+        else if(dt==="step_start"){ appendReasoningStep(data,false); }
+        else if(dt==="step_result"){ appendReasoningStep(data,true); }
         else if(dt==="task_result"){
           intent=data.task_type; taskResult=data.data;
           handleTaskResult(intent,taskResult);
@@ -586,7 +649,7 @@ async function streamSendMessage(message){
           }
         }
         else if(dt==="error"){ throw new Error(data.message||"AI 服务异常"); }
-        else if(dt==="done"){ }
+        else if(dt==="done"){ lastTaskLogId=data&&data.task_log_id?data.task_log_id:lastTaskLogId; finishReasoningUI(lastTaskLogId); }
       }
     }
     document.getElementById("sbLoading").classList.remove("show");
@@ -598,6 +661,26 @@ async function streamSendMessage(message){
   }finally{aiBusy=false;setSending(false);}
 }
 function setSending(b){document.getElementById("sendBtn").disabled=b;}
+
+/* ===================== V3.3.1：手动综合推理 ===================== */
+function triggerReasoning(){
+  if(!curExt){toast("请先选择客户");return;}
+  if(!CUR_USER.wework_account_id){toast("未绑定企微账户");return;}
+  if(aiBusy){toast("AI 上一次任务未结束，请稍候");return;}
+  if(humanModeFlag){toast("当前为人工模式，请先恢复 AI 模式");return;}
+  // 优先用输入框内容；否则取最近一条家长消息
+  var msg=document.getElementById("msgInput").value.trim();
+  if(!msg){
+    for(var i=chatHistory.length-1;i>=0;i--){
+      var m=chatHistory[i];
+      if(m&&m.who!=="me"&&m.content){ msg=m.content; break; }
+    }
+  }
+  if(!msg){toast("请先输入家长问题，或选择有聊天记录的客户");return;}
+  document.getElementById("msgInput").value="";
+  document.getElementById("aiSub").textContent="AI 综合推理中…";
+  streamSendMessage(msg, "reasoning_suggestion");
+}
 function humanMode(){humanModeFlag=!humanModeFlag;toast(humanModeFlag?"已切换人工模式（不调用 AI）":"已恢复 AI 模式");if(humanModeFlag){document.getElementById("degradeBanner").classList.add("show");}else{recoverAI();}}
 
 /* ===================== 处理任务结果 ===================== */
@@ -611,12 +694,128 @@ function handleTaskResult(intent,data){
     }
     return;
   }
+  if(intent==="reasoning"){
+    renderReasoningResult(data);
+    return;
+  }
   var tab = intent==="profile"?"profile":intent==="reply"?"reply":intent==="tag"?"tag":intent==="schedule"?"todo":"reply";
   sbTab(tab);
   if(intent==="profile"){ _pendingProfile={interrupt_id:"",thread_id:null}; renderProfileFromAI(data); }
   else if(intent==="reply") renderReply(data);
   else if(intent==="tag") renderTagFromAI(data);
   else if(intent==="schedule") renderTodoFromAI(data);
+}
+
+/* ===================== 二期：综合推理逐步透明展示 ===================== */
+var _reasoningStepCount=0;
+var _reasoningTaskLogId=null;
+function resetReasoningUI(){
+  _reasoningStepCount=0; _reasoningTaskLogId=null;
+  document.getElementById("reasoningSteps").innerHTML="";
+  var r=document.getElementById("reasoningResult");
+  r.style.display="none"; r.innerHTML="";
+}
+function appendReasoningStep(data,isResult){
+  if(!data)return;
+  var idx=data.step_index||(_reasoningStepCount+1);
+  // 首个推理步骤到达时自动切到「综合推理」Tab（仅推理场景）
+  if(_reasoningStepCount===0) sbTab("reasoning");
+  var el=document.getElementById("rstep-"+idx);
+  if(!el){
+    el=document.createElement("div"); el.className="rstep"; el.id="rstep-"+idx;
+    el.innerHTML='<div class="rs-head"><span class="rs-ico">'+(idx)+'</span><span class="rs-desc">'+(escapeHtml(data.description||data.tool||"推理步骤"))+'</span><span class="rs-status run">分析中…</span></div><div class="rs-text"></div><div class="rs-meta"></div>';
+    document.getElementById("reasoningSteps").appendChild(el);
+  }
+  _reasoningStepCount=Math.max(_reasoningStepCount,idx);
+  if(isResult){
+    var st=data.status||"done";
+    el.querySelector(".rs-status").className="rs-status "+(st==="error"?"err":"done");
+    el.querySelector(".rs-status").textContent=st==="error"?"执行失败":(data.converged?"已达步数上限":"完成");
+    el.querySelector(".rs-text").textContent=data.text||"";
+    var meta=el.querySelector(".rs-meta");
+    if(data.matched===false){ meta.innerHTML='<span class="miss-tag">⚠ 未命中资料库（已记盲区）</span>'; }
+    else if(data.matched===true){ meta.innerHTML='<span class="src-tag">✓ 已匹配官方资料</span>'; }
+    if(data.converged){ meta.innerHTML+='<span class="miss-tag">已达步数上限，信息可能不全</span>'; }
+  }
+}
+function renderReasoningResult(data){
+  if(!data)return;
+  var reply=typeof data==="string"?data:(data.reply||"");
+  var steps=Array.isArray(data)?data:(data.steps||[]);
+  var sources=data.sources||[];
+  var mode=data.mode||"reasoning";
+  // 步骤未通过 SSE 推送时（如简化模式/异常），从结果补齐
+  if(steps.length>_reasoningStepCount){ resetReasoningUI(); steps.forEach(function(s){ appendReasoningStep(s,true); }); }
+  var r=document.getElementById("reasoningResult");
+  var srcHtml="";
+  if(sources&&sources.length){
+    var seen={};
+    srcHtml='<div class="sources"><b>📌 信息来源标注：</b><br>';
+    sources.forEach(function(s){
+      var key=(s.title||"")+"|"+(s.text||"").slice(0,50);
+      if(seen[key])return; seen[key]=1;
+      srcHtml+='<span style="margin-right:6px">['+(s.step?("第"+s.step+"步 "):"")+(s.title||s.tool||"资料")+']</span>';
+    });
+    srcHtml+='</div>';
+  }
+  var modeTag = mode==="simplified"?'<span class="miss-tag" style="margin-left:6px">简化模式（全局开关关闭）</span>':(mode==="error"?'<span class="miss-tag" style="margin-left:6px">推理异常·已走兜底</span>':"");
+  r.innerHTML='<div class="rr-sugg">'+
+    '<div class="head"><span class="ai-tag">AI 综合建议</span><span class="hint">发送前请核实来源与数据</span>'+modeTag+'</div>'+
+    '<div class="body">'+escapeHtml(reply)+'</div>'+srcHtml+
+    '<div class="acts">'+
+      '<button class="btn btn-blue btn-sm" onclick="sendReasoningSugg(\'adopted\')">一键发送</button>'+
+      '<button class="btn btn-ghost btn-sm" onclick="sendReasoningSugg(\'modified\')">修改后发送</button>'+
+      '<button class="btn btn-ghost btn-sm" onclick="copyReasoningSugg()">复制</button>'+
+    '</div>'+
+    '<div class="fb-row">'+
+      '<span class="hint">这个推理结果对您有帮助吗？</span>'+
+      '<button class="fb-btn" id="fbPos" onclick="reasoningFeedback(\'positive\')">👍 有帮助</button>'+
+      '<button class="fb-btn" id="fbNeg" onclick="reasoningFeedback(\'negative\')">👎 没帮助/方向不对</button>'+
+    '</div>'+
+    '<div class="rr-note">⚠ 发送键始终在您手上：AI 建议可撤回，您发出的消息不可撤回。建议基于画像/订单/知识库数据生成，请核实最新情况。</div>'+
+  '</div>';
+  r.style.display="block";
+  document.getElementById("aiSub").textContent="综合推理完成：已生成带来源标注的建议";
+}
+function finishReasoningUI(taskLogId){
+  if(taskLogId) _reasoningTaskLogId=taskLogId;
+}
+function _reasoningText(){
+  var r=document.getElementById("reasoningResult");
+  var b=r.querySelector(".rr-sugg .body");
+  return b?b.innerText:"";
+}
+async function sendReasoningSugg(mode){
+  var txt=_reasoningText();
+  if(!txt||!curExt){toast("暂无可发送的综合建议");return;}
+  if(!CUR_USER.wework_account_id){toast("未绑定企微账户");return;}
+  const optimistic={who:"me",advisor_name:CUR_USER.name,content:txt,send_time:"刚刚",msg_date:""};
+  chatHistory.push(optimistic); renderChat();
+  document.getElementById("msgInput").value="";
+  // 上报行为（采纳/修改后发送）→ 采纳率/修改率
+  if(_reasoningTaskLogId){
+    try{ await asyncFetch(API+"/task_action",{method:"POST",body:JSON.stringify({task_log_id:_reasoningTaskLogId,action:mode==="adopted"?"adopted":"modified",snapshot:{source:"reasoning"}})}); }catch(e){}
+  }
+  try{
+    await asyncFetch(API+"/send_message",{method:"POST",body:JSON.stringify({message:txt,external_id:curExt,wework_account_id:CUR_USER.wework_account_id,skip_ai:true})});
+    toast(mode==="adopted"?"已发送并记录采纳 ✓":"已发送并记录修改 ✓");
+  }catch(e){ toast("发送失败："+e.message); }
+}
+function copyReasoningSugg(){
+  var txt=_reasoningText();
+  if(!txt){toast("暂无可复制的建议");return;}
+  try{navigator.clipboard&&navigator.clipboard.writeText(txt).catch(function(){});}catch(e){}
+  document.getElementById("msgInput").value=txt;
+  toast("已复制到输入框，可直接发送");
+}
+async function reasoningFeedback(signal){
+  if(!_reasoningTaskLogId){toast("暂无可反馈的推理任务");return;}
+  try{
+    await asyncFetch(API+"/feedback",{method:"POST",body:JSON.stringify({task_log_id:_reasoningTaskLogId,signal_type:signal,snapshot:{source:"reasoning"}})});
+    document.getElementById("fbPos").classList.toggle("on",signal==="positive");
+    document.getElementById("fbNeg").classList.toggle("on",signal==="negative");
+    toast("反馈已记录，感谢您的反馈（用于持续优化）");
+  }catch(e){toast("反馈失败："+e.message);}
 }
 
 /* ===================== Mock AI 回复（演示模式后备） ===================== */
@@ -638,10 +837,6 @@ function mockAIResponse(userMessage){
   // 生成 AI 画像
   var profile = generateMockProfile(custName, childName, grade, subject);
   renderProfileFromAI(profile);
-
-  // 生成 AI 标签推荐
-  var tags = generateMockTags(grade, subject);
-  renderTagFromAI(tags);
 
   // 生成 AI 日程识别
   var schedules = generateMockSchedules(userMessage, custName, childName, grade, subject);
@@ -709,18 +904,6 @@ function generateMockProfile(custName, childName, grade, subject){
   ];
 }
 
-function generateMockTags(grade, subject){
-  var tags = [];
-  tags.push({tag_id:"tag_gaoyixiang", tag_name:"高意向", cls:"plus", info:"连续咨询"+(subject||"课程")+"，表达明确报班意愿", conf:"高置信"});
-  if(grade&&(grade.indexOf("初三")>=0||grade.indexOf("高三")>=0)){
-    tags.push({tag_id:"tag_shengxuechongci", tag_name:"升学冲刺", cls:"plus", info:grade+"在读，升学备考需求明确", conf:"高置信"});
-  }
-  if(subject&&subject.indexOf("数学")>=0){
-    tags.push({tag_id:"tag_shuxueruo", tag_name:"数学薄弱", cls:"plus", info:"聊天提及数学成绩不理想", conf:"中置信"});
-  }
-  tags.push({tag_id:"tag_jiageguanzhu", tag_name:"价格关注", cls:"plus", info:"主动询问课程费用和优惠活动", conf:"中置信"});
-  tags.push({tag_id:"tag_shitingyixiang", tag_name:"试听意向", cls:"plus", info:"表达了试听/体验课程的意愿", conf:"高置信"});
-  return tags;}
 function generateMockSchedules(msg, custName, childName, grade, subject){
   var m=(msg||"");
   var scheds=[];
@@ -752,15 +935,19 @@ function generateMockSchedules(msg, custName, childName, grade, subject){
   }
   return scheds;
 }
-function triggerTagAnalysis(){
-  if(!curCust){toast("请先选择客户");return;}
-  var grade=curCust.grade||"";
-  var subject=curCust.focus_subject||"";
-  var tags=generateMockTags(grade, subject);
-  _aiTags=tags;
-  renderTagsMerged();
-  sbTab("tag");
-  toast("已生成 "+tags.length+" 条标签推荐 ✓");
+async function triggerTagAnalysis(){
+  if(!curExt||!curCust){toast("请先选择客户");return;}
+  try{
+    var res=await asyncFetch(API+"/customer_tags/"+encodeURIComponent(curExt)+"/suggest",{method:"POST"});
+    if(!res||!res.success){toast((res&&res.message)||"标签推荐失败");return;}
+    var list=(res.data||[]).map(function(x){
+      return {tag_id:x.tag_id, tag_name:x.tag_name||x.tag_id, cls:"plus", info:x.reason||x.ai_rule||"", conf:"高置信"};
+    });
+    _aiTags=list;
+    renderTagsMerged();
+    sbTab("tag");
+    toast("已生成 "+list.length+" 条标签推荐 ✓");
+  }catch(e){toast("标签生成失败："+e.message);}
 }
 function renderProfileFromAI(data){
   if(!data){return;}
@@ -772,11 +959,11 @@ function renderProfileFromAI(data){
     const conf=it.confidence_level||it.confidence||"";
     const cls=conf==="高"||conf==="hi"?"hi":(conf==="中"||conf==="mid"?"mid":"lo");
     const label=conf==="高"||conf==="hi"?"高置信":(conf==="中"||conf==="mid"?"中置信":"低置信");
-    const ref=it.source_ref?escapeHtml(it.source_ref):"—";
+    const ref=it.source_ref?jsStr(it.source_ref):"—";
     const confTag=conf?('<span class="conf '+cls+'">'+label+'</span>'):"";
-    rows+=('<div class="kv"><span class="k">'+escapeHtml(name)+'</span><span class="v">'+escapeHtml(String(val))+' '+confTag+'<button class="source-link" onclick="showSource(\''+escapeHtml(name)+'\',\''+ref+'\')">来源</button></span></div>');
+    rows+=('<div class="kv"><span class="k">'+escapeHtml(name)+'</span><span class="v">'+escapeHtml(String(val))+' '+confTag+'<button class="source-link" onclick="showSource(\''+jsStr(name)+'\',\''+ref+'\')">来源</button></span></div>');
   });
-  var html='<div class="sect">AI 实时画像草稿</div><div class="card">'+rows+'</div><p class="hint">AI 画像草稿需该客户负责顾问确认后写入正式画像库（B3）。区域主管可复核。</p><div class="alias-row"><button class="btn btn-primary btn-sm" onclick="confirmProfile()">确认生效</button><button class="btn btn-ghost btn-sm" onclick="discardProfile()">忽略</button></div>';
+  var html='<div class="sect">AI 实时画像草稿</div><div class="card">'+rows+'</div><p class="hint">AI 画像草稿需该客户负责顾问确认后写入正式画像库。区域主管可复核。</p><div class="alias-row"><button class="btn btn-primary btn-sm" onclick="confirmProfile()">确认生效</button><button class="btn btn-ghost btn-sm" onclick="discardProfile()">忽略</button></div>';
   document.getElementById("pane-profile").innerHTML=html;
 }
 function renderReply(data){
@@ -875,19 +1062,19 @@ async function sendSugg(i){
     toast("发送失败："+e.message);
   }
   renderReply(loadCurrentReplies());
-  toast("已发送并记录采纳（N21）");
+  toast("已发送并记录采纳");
 }
 function recordAdoptionIfSent(message){
   if(!copiedSuggestion||copiedSuggestion.customer!==curExt||copiedSuggestion.text!==message)return;
   adoptedReplies[curExt]=adoptedReplies[curExt]||{}; adoptedReplies[curExt][copiedSuggestion.index]=true;
-  copiedSuggestion=null; renderReply(loadCurrentReplies()); toast("已记录采纳行为（N21）");
+  copiedSuggestion=null; renderReply(loadCurrentReplies()); toast("已记录采纳行为");
 }
 function loadCurrentReplies(){
   if(!_lastReplies||!_lastReplies.length) return [];
   return _lastReplies;
 }
 var _lastReplies = [];
-function rejectSugg(i){toast("已标记不采用，负反馈已记录（N22）");var el=document.getElementById("sugg-"+i);if(el)el.classList.add("adopted");}
+function rejectSugg(i){toast("已标记不采用，负反馈已记录");var el=document.getElementById("sugg-"+i);if(el)el.classList.add("adopted");}
 
 function renderTagFromAI(data){
   let arr=Array.isArray(data)?data:(data&&data.tags||[]);
@@ -911,7 +1098,7 @@ function renderTodoFromAI(data){
     const src=s.source||"ai";
     html+=`<div class="todo"><div class="pri ${pri}"></div><div class="tmain"><div class="ttitle">${escapeHtml(title||"日程")}</div><div class="tdesc">${escapeHtml(desc)}</div><div class="tmeta">⚡ ${pri==="高"?"高优先级·强提醒":pri==="中"?"中·通知":"一般"} · <span style="color:var(--purple)">${src==="manual"?"人工创建":"AI 自动识别"}</span></div></div></div>`;
   });
-  html+=`<div class="alias-row"><span class="badge-draft" style="margin-right:8px" title="AI自动识别，待顾问确认后生效">⏳ 待确认</span><button class="btn btn-blue btn-sm" onclick="toast('已确认创建并同步企业微信日历（I2）')">✓ 确认并同步企微</button><button class="btn btn-ghost btn-sm" onclick="toast('已忽略该识别建议')">忽略</button></div>`;
+  html+=`<div class="alias-row"><span class="badge-draft" style="margin-right:8px" title="AI自动识别，待顾问确认后生效">⏳ 待确认</span><button class="btn btn-blue btn-sm" onclick="toast('已确认创建并同步企业微信日历')">✓ 确认并同步企微</button><button class="btn btn-ghost btn-sm" onclick="toast('已忽略该识别建议')">忽略</button></div>`;
   document.getElementById("pane-todo").innerHTML=html;
 }
 
@@ -939,18 +1126,17 @@ function renderProfilePane(data){
   });
   const renderKV=its=>its.map(it=>{const lv=it.confidence_level||(it.confidence?(it.confidence>=0.85?"高":(it.confidence>=0.7?"中":"低")):"");
     const cls=lv==="高"?"hi":(lv==="中"?"mid":"lo"); const lbl=lv?(" "+(lv==="高"?"高置信":lv==="中"?"中置信":"低置信")):"";
-    const ref=escapeHtml(it.source_ref||"—");
-    return '<div class="kv"><span class="k">'+escapeHtml(it.item_name||"")+'</span><span class="v">'+escapeHtml(String(it.item_value||""))+' '+(lv?'<span class="conf '+cls+'">'+lbl+'</span>':'')+'<button class="source-link" onclick="showSource(\''+escapeHtml(it.item_name||"")+'\',\''+ref+'\')">来源</button></span></div>';});
+    const ref=it.source_ref?jsStr(it.source_ref):"—";
+    return '<div class="kv"><span class="k">'+escapeHtml(it.item_name||"")+'</span><span class="v">'+escapeHtml(String(it.item_value||""))+' '+(lv?'<span class="conf '+cls+'">'+lbl+'</span>':'')+'<button class="source-link" onclick="showSource(\''+jsStr(it.item_name||"")+'\',\''+ref+'\')">来源</button></span></div>';});
   const sec=(t,its)=>its&&its.length?'<div class="sect">'+t+'</div><div class="card">'+renderKV(its)+'</div>':"";
-  const canConfirm = CUR_USER.data_scope==="self" && CUR_USER.user_id===(data.follow_user_id||curCust&&curCust.follow_user_id);
-  const action = status==="已确认"? '<span class="badge-ok">已确认生效（B3）</span>' :
-    (canConfirm? `<button class="btn btn-primary btn-sm" onclick="confirmProfile()">确认生效</button>` : '<span class="badge-draft">草稿待客户顾问确认</span>');
-  pane.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span>${status==="已确认"?'<span class="badge-ok">已确认生效（B3）</span>':'<span class="badge-draft">草稿状态（B3：需顾问确认后生效）</span>'}</span>${action}</div>
+  const action = status==="已确认"? '<span class="badge-ok">已确认生效</span>' :
+    `<button class="btn btn-primary btn-sm" onclick="confirmProfile()">确认生效</button>`;
+  pane.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span>${status==="已确认"?'<span class="badge-ok">已确认生效</span>':'<span class="badge-draft">草稿状态（需顾问确认后生效）</span>'}</span>${action}</div>
     ${sec("基础信息",grouped["基础信息"])}
     ${sec("学情分析",grouped["学情分析"])}
     ${sec("沟通偏好",grouped["沟通偏好"])}
     <div class="alias-row"><button class="btn btn-ai btn-sm" onclick="triggerProfile()">重新生成画像</button></div>
-    <p class="hint">字段旁可查看来源记录；置信度按高≥85%、中≥70%、低＜70%展示（FR-1.4）。</p>`;
+    <p class="hint">字段旁可查看来源记录；置信度按高≥85%、中≥70%、低＜70%展示。</p>`;
 }
 var _lastProfileSnapshot=null;
 var _pendingProfile=null;   // 待确认画像的中断信息 {interrupt_id, thread_id}
@@ -974,14 +1160,25 @@ async function triggerProfile(){
   aiBusy=false; setSending(false);
 }
 async function confirmProfile(){
-  if(!_pendingProfile||!_pendingProfile.interrupt_id){ toast("暂无可确认的画像"); loadProfile(); return; }
-  const id=_pendingProfile.interrupt_id;
+  if(!curExt)return;
+  if(_pendingProfile&&_pendingProfile.interrupt_id){
+    const id=_pendingProfile.interrupt_id;
+    try{
+      await asyncFetch(API+"/confirm_interrupt",{method:"POST",body:JSON.stringify({interrupt_id:id,confirmed:"ok",thread_id:_pendingProfile.thread_id})});
+      pendingInterrupts=pendingInterrupts.filter(x=>!(x&&x.interrupt_id===id));
+      renderInterruptBadge();
+      _pendingProfile=null;
+      toast("画像已确认生效，写入正式画像库 ✓");
+    }catch(e){
+      toast("确认失败："+e.message);
+    }
+    loadProfile();
+    return;
+  }
+  // 无中断上下文（已入库草稿）：直接确认最新草稿
   try{
-    await asyncFetch(API+"/confirm_interrupt",{method:"POST",body:JSON.stringify({interrupt_id:id,confirmed:"ok",thread_id:_pendingProfile.thread_id})});
-    pendingInterrupts=pendingInterrupts.filter(x=>!(x&&x.interrupt_id===id));
-    renderInterruptBadge();
-    _pendingProfile=null;
-    toast("画像已确认生效，写入正式画像库 ✓");
+    const res=await asyncFetch(API+"/customer_profile/"+encodeURIComponent(curExt)+"/confirm",{method:"POST"});
+    toast((res&&res.message)||"画像已确认生效 ✓");
   }catch(e){
     toast("确认失败："+e.message);
   }
@@ -1002,7 +1199,7 @@ async function discardProfile(){
   loadProfile();
 }
 
-/* ===================== 画像实时推送（N2） ===================== */
+/* ===================== 画像实时推送 ===================== */
 var _profileStreamCtrl=null;
 async function startProfileStream(){
   stopProfileStream();
@@ -1062,7 +1259,8 @@ function renderTagsMerged(){
   if(_confirmedTags.length>0){
     html+=`<div class="sect">✓ 已确认标签</div>`;
     _confirmedTags.forEach(function(t){
-      html+=`<div class="tagin"><span class="tg confirmed">✓ ${escapeHtml(t.tag_name||"")}</span><div class="info">已确认（由 ${escapeHtml(t.confirmed_by||"—")} 于 ${escapeHtml(String(t.confirmed_at||"").slice(0,16))}）</div></div>`;
+      var tid=jsStr(t.tag_id||t.t||"");
+      html+=`<div class="tagin"><span class="tg confirmed">✓ ${escapeHtml(t.tag_name||"")}</span><div class="info">已确认（由 ${escapeHtml(t.confirmed_by||"—")} 于 ${escapeHtml(String(t.confirmed_at||"").slice(0,16))}）</div><div class="acts"><button class="ig-act" onclick="deleteTag('${tid}')">删除</button></div></div>`;
     });
   }
   if(filteredAi.length>0){
@@ -1073,14 +1271,14 @@ function renderTagsMerged(){
       const conf=escapeHtml(t.conf||"");
       const info=escapeHtml(t.info||t.ai_rule||"");
       const tag_name=escapeHtml(t.tag_name||t.t||"");
-      var tid=escapeHtml(t.tag_id||t.t||"");
+      var tid=jsStr(t.tag_id||t.t||"");
       html+='<div class="tagin"><span class="tg '+cls+'">'+sign+tag_name+'</span><div class="info">'+info+' '+(conf?'<span class="conf">'+conf+'</span>':'')+'</div><div class="acts"><button class="ok-act" onclick="confirmTagAi(\''+tid+'\')">✓ 确认</button><button class="ig-act" onclick="ignoreTagAi(\''+tid+'\')">忽略</button></div></div>';
     });
   }
   if(!_confirmedTags.length&&!filteredAi.length){
     html=`<div class="sect">客户标签</div><div class="hint">该客户暂无标签，可发送消息让 AI 生成推荐</div>`;
   }
-  html+=`<div class="alias-row"><button class="btn btn-ai btn-sm" onclick="triggerTagAnalysis()">生成标签推荐</button><button class="btn btn-ghost btn-sm" onclick="triggerTagAnalysis()">刷新标签分析</button></div><p class="hint">标签需顾问确认后生效（B3）；确认/忽略触发埋点统计（N22）。</p>`;
+  html+=`<div class="alias-row"><button class="btn btn-ai btn-sm" onclick="triggerTagAnalysis()">生成标签推荐</button><button class="btn btn-ghost btn-sm" onclick="triggerTagAnalysis()">刷新标签分析</button></div><p class="hint">标签需顾问确认后生效。</p>`;
   document.getElementById("pane-tag").innerHTML=html;
 }
 async function confirmTagAi(tagId){
@@ -1111,31 +1309,72 @@ async function ignoreTagAi(tagId){
   renderTagsMerged();
   toast("已忽略该标签建议");
 }
+async function deleteTag(tagId){
+  if(!curExt||!tagId)return;
+  try{
+    const res=await asyncFetch(API+"/customer_tags/"+encodeURIComponent(curExt)+"/"+encodeURIComponent(tagId),{method:"DELETE"});
+    if(res&&res.success){
+      _confirmedTags=_confirmedTags.filter(function(t){return (t.tag_id||t.t)!==tagId;});
+      renderTagsMerged();
+      toast("标签已删除");
+    }else{
+      toast((res&&res.message)||"标签删除失败");
+    }
+  }catch(e){toast("删除失败："+e.message);}
+}
 
+var _schedules=[];            // 已入库日程（含待确认/已确认）
+var _aiSchedules=[];          // AI 识别出的日程建议（未入库，需逐条确认添加）
 async function loadSchedules(){
   if(!curExt)return;
+  _aiSchedules=[];
   try{
     const j=await asyncFetch(API+"/customer_schedules/"+encodeURIComponent(curExt));
-    renderSchedulesPane(j.data||[]);
+    _schedules=j.data||[];
+    renderSchedulePaneAll();
   }catch(e){document.getElementById("pane-todo").innerHTML=`<div class='hint'>加载日程失败：${escapeHtml(e.message)}</div>`;}
 }
-function renderSchedulesPane(schs){
-  if(!schs.length){document.getElementById("pane-todo").innerHTML=`<div class="sect">日程提醒</div><div class="hint">暂无日程。AI 会从聊天中识别时间实体，发送含时间的消息可生成日程建议。</div><div class="alias-row"><button class="btn btn-ai btn-sm" onclick="triggerScheduleAnalysis()">AI 识别日程</button></div>`;return;}
+function renderSchedulePaneAll(){
+  let html=renderScheduleListHtml(_schedules);
+  if(_aiSchedules.length) html+=renderAiSuggestionHtml(_aiSchedules);
+  document.getElementById("pane-todo").innerHTML=html;
+}
+function renderScheduleListHtml(schs){
   const priN={"高":"高优先级·强提醒","中":"中·通知","低":"一般·侧边栏弱提示"};
+  if(!schs.length){
+    return `<div class="sect">日程提醒</div><div class="hint">暂无日程。发送含时间的消息或点击下方按钮，AI 会识别日程建议。</div><div class="alias-row"><button class="btn btn-ai btn-sm" onclick="triggerScheduleAnalysis()">AI 识别日程</button><button class="btn btn-ghost btn-sm" onclick="showRemindPref()">⏰ 提醒偏好设置</button></div>`;
+  }
   let html=`<div class="sect">日程提醒</div>`;
   schs.forEach(s=>{
     const pri=s.priority||"中";
     const status=s.status||"待确认";
-    const st=status==="已确认"?'<span class="badge-ok" title="客户已回应确认该日程">✓ 已确认</span>':'<span class="badge-draft" title="AI自动识别，待客户回应确认">⏳ 待确认</span>';
+    const confirmedBy=s.confirm_source==="operator"?"操作员确认":(s.confirm_source==="ai"?"AI 自动确认":"");
     const src=s.source==="manual"?"人工创建":"AI 自动识别";
-    html+=`<div class="todo"><div class="pri ${pri}"></div><div class="tmain"><div class="ttitle">${escapeHtml(s.title||"")}</div><div class="tdesc">${escapeHtml(String(s.start_time||"").slice(0,16))} ${s.end_time?'— '+escapeHtml(String(s.end_time||"").slice(0,16)):''}</div><div class="tmeta">⚡ ${priN[pri]||pri} · <span style="color:var(--purple)">${src}</span> ${st}</div></div></div>`;
+    let st, acts;
+    if(status==="已确认"){
+      st=`<span class="badge-ok" title="${confirmedBy||"已确认"}">✓ 已确认${confirmedBy?' · '+confirmedBy:''}</span>`;
+      acts=`<button class="ig-act" style="margin-left:8px;font-size:12px" onclick="deleteSchedule(${s.id})">删除</button>`;
+    }else{
+      st=`<span class="badge-draft" title="待确认，操作员确认或 AI 自动确认后生效">⏳ 待确认</span>`;
+      acts=`<button class="ok-act" style="margin-left:8px;font-size:12px" onclick="confirmSchedule(${s.id})">确认</button><button class="ig-act" style="margin-left:8px;font-size:12px" onclick="deleteSchedule(${s.id})">删除</button>`;
+    }
+    html+=`<div class="todo"><div class="pri ${pri}"></div><div class="tmain"><div class="ttitle">${escapeHtml(s.title||"")}${acts}</div><div class="tdesc">${escapeHtml(String(s.start_time||"").slice(0,16))} ${s.end_time?'— '+escapeHtml(String(s.end_time||"").slice(0,16)):''}</div><div class="tmeta">⚡ ${priN[pri]||pri} · <span style="color:var(--purple)">${src}</span> ${st}</div></div></div>`;
   });
-  html+=`<div class="alias-row"><button class="btn btn-ai btn-sm" onclick="triggerScheduleAnalysis()">AI 识别日程</button><button class="btn btn-ghost btn-sm" onclick="showRemindPref()">⏰ 提醒偏好设置</button><button class="btn btn-ghost btn-sm" onclick="toast('已同步到企业微信日历（I2）')">📅 同步企微日历</button></div>
-  <p class="hint">AI 自动识别聊天中的时间信息并生成日程建议。客户回应确认后状态变为「已确认」，未回应则保持「待确认」。</p>`;
-  document.getElementById("pane-todo").innerHTML=html;
+  html+=`<div class="alias-row"><button class="btn btn-ai btn-sm" onclick="triggerScheduleAnalysis()">AI 识别日程</button><button class="btn btn-ghost btn-sm" onclick="showRemindPref()">⏰ 提醒偏好设置</button></div>
+  <p class="hint">AI 识别出的日程需逐条「确认添加」后才进入列表，状态为「待确认」；操作员点「确认」或 AI 自动确认后变为「已确认」，操作员确认后 AI 不再改动。</p>`;
+  return html;
 }
-var _pendingSchedule=null;   // 待确认日程的中断信息 {interrupt_id, thread_id}
-var _aiSchedules=[];         // AI 识别出的待确认日程建议
+function renderAiSuggestionHtml(schs){
+  const priN={"高":"高优先级·强提醒","中":"中·通知","低":"一般·侧边栏弱提示"};
+  let html=`<div class="sect" style="margin-top:12px">AI 日程建议（确认添加后进入待确认列表）</div>`;
+  schs.forEach((s,i)=>{
+    const pri=s.priority||"中";
+    const confirmedTag=s.confirmed?'<span class="badge-ok">✓ 客户已同意</span>':'';
+    html+=`<div class="todo"><div class="pri ${pri}"></div><div class="tmain"><div class="ttitle">${escapeHtml(s.title||"日程")}</div><div class="tdesc">${escapeHtml(String(s.start_time||"").slice(0,16))}</div><div class="tmeta">⚡ ${priN[pri]||pri} · <span style="color:var(--purple)">${escapeHtml(s.source||"AI 自动识别")}</span> ${confirmedTag}</div><div style="display:flex;gap:6px;margin-top:6px"><button class="ok-act" onclick="addScheduleSuggestion(${i})">✓ 确认添加</button><button class="ig-act" onclick="ignoreScheduleSuggestion(${i})">忽略</button></div></div></div>`;
+  });
+  html+=`<p class="hint">AI 自动识别聊天中的时间信息并生成日程建议，确认添加后才写入待确认日程列表。</p>`;
+  return html;
+}
 async function triggerScheduleAnalysis(){
   if(!curExt||!curCust)return;
   aiBusy=true; setSending(true);
@@ -1144,11 +1383,11 @@ async function triggerScheduleAnalysis(){
   try{
     var res=await asyncFetch(API+"/customer_schedules/"+encodeURIComponent(curExt)+"/generate",{method:"POST"});
     if(res&&res.success&&res.data){
-      _pendingSchedule={interrupt_id:res.data.interrupt_id||"", thread_id:res.data.thread_id||null};
-      renderScheduleSuggestions(res.data.schedules||[]);
+      _aiSchedules=res.data.schedules||[];
+      renderSchedulePaneAll();
       sbTab("todo");
-      var cnt=(res.data.schedules||[]).length;
-      toast(cnt? "AI 日程识别完成，请确认生效 ✓" : "未识别到含明确日期的日程");
+      var cnt=_aiSchedules.length;
+      toast(cnt? "AI 日程识别完成，请逐条确认添加 ✓" : "未识别到含明确日期的日程");
     }else{
       toast(res&&res.detail?res.detail:"未识别到日程");
     }
@@ -1159,48 +1398,55 @@ async function triggerScheduleAnalysis(){
   document.getElementById("aiSub").textContent="日程识别完成："+curCust.name;
   aiBusy=false; setSending(false);
 }
-function renderScheduleSuggestions(schs){
-  _aiSchedules=schs||[];
-  const priN={"高":"高优先级·强提醒","中":"中·通知","低":"一般·侧边栏弱提示"};
-  if(!_aiSchedules.length){
-    document.getElementById("pane-todo").innerHTML=`<div class="sect">日程提醒</div><div class="hint">AI 未从聊天中识别到含明确日期的日程。</div><div class="alias-row"><button class="btn btn-ai btn-sm" onclick="triggerScheduleAnalysis()">重新识别</button></div>`;
-    return;
-  }
-  let html=`<div class="sect">AI 从聊天中识别日程建议</div>`;
-  _aiSchedules.forEach(s=>{
-    const pri=s.priority||"中";
-    html+=`<div class="todo"><div class="pri ${pri}"></div><div class="tmain"><div class="ttitle">${escapeHtml(s.title||"日程")}</div><div class="tdesc">${escapeHtml(String(s.start_time||"").slice(0,16))}</div><div class="tmeta">⚡ ${priN[pri]||pri} · <span style="color:var(--purple)">${escapeHtml(s.source||"AI 自动识别")}</span></div></div></div>`;
-  });
-  html+=`<div class="alias-row"><span class="badge-draft" style="margin-right:8px" title="AI自动识别，待顾问确认后生效">⏳ 待确认</span><button class="btn btn-blue btn-sm" onclick="confirmScheduleAnalysis()">✓ 确认并同步企微</button><button class="btn btn-ghost btn-sm" onclick="discardScheduleAnalysis()">忽略</button></div>`;
-  document.getElementById("pane-todo").innerHTML=html;
-}
-async function confirmScheduleAnalysis(){
-  if(!_pendingSchedule||!_pendingSchedule.interrupt_id){ toast("暂无可确认的日程"); loadSchedules(); return; }
-  const id=_pendingSchedule.interrupt_id;
+async function addScheduleSuggestion(i){
+  if(!curExt)return;
+  var s=_aiSchedules[i];
+  if(!s)return;
   try{
-    await asyncFetch(API+"/confirm_interrupt",{method:"POST",body:JSON.stringify({interrupt_id:id,confirmed:"ok",thread_id:_pendingSchedule.thread_id})});
-    pendingInterrupts=pendingInterrupts.filter(x=>!(x&&x.interrupt_id===id));
-    renderInterruptBadge();
-    _pendingSchedule=null; _aiSchedules=[];
-    toast("日程已确认生效 ✓");
-  }catch(e){
-    toast("确认失败："+e.message);
-  }
+    var res=await asyncFetch(API+"/customer_schedules/"+encodeURIComponent(curExt)+"/add",{method:"POST",body:JSON.stringify({
+      title:s.title||"日程",
+      start_time:s.start_time||null,
+      end_time:s.end_time||null,
+      priority:s.priority||"中",
+      source:s.source||"AI 识别"
+    })});
+    if(res&&res.success){
+      _aiSchedules.splice(i,1);
+      toast("已添加到待确认日程 ✓");
+      loadSchedules();
+    }else{
+      toast((res&&res.message)||"添加失败");
+    }
+  }catch(e){toast("添加失败："+e.message);}
+}
+function ignoreScheduleSuggestion(i){
+  if(i<0||i>=_aiSchedules.length)return;
+  _aiSchedules.splice(i,1);
+  renderSchedulePaneAll();
+  toast("已忽略该日程建议");
+}
+async function confirmSchedule(scheduleId){
+  try{
+    const res=await asyncFetch(API+"/customer_schedules/"+scheduleId+"/confirm",{method:"POST"});
+    if(res&&res.success){
+      toast("日程已确认 ✓");
+    }else{
+      toast((res&&res.message)||"确认失败");
+    }
+  }catch(e){toast("确认失败："+e.message);}
   loadSchedules();
 }
-async function discardScheduleAnalysis(){
-  if(!_pendingSchedule||!_pendingSchedule.interrupt_id){ toast("暂无可确认的日程"); loadSchedules(); return; }
-  const id=_pendingSchedule.interrupt_id;
+async function deleteSchedule(scheduleId){
+  if(!scheduleId)return;
   try{
-    await asyncFetch(API+"/confirm_interrupt",{method:"POST",body:JSON.stringify({interrupt_id:id,confirmed:"discard",thread_id:_pendingSchedule.thread_id})});
-    pendingInterrupts=pendingInterrupts.filter(x=>!(x&&x.interrupt_id===id));
-    renderInterruptBadge();
-    _pendingSchedule=null; _aiSchedules=[];
-    toast("已忽略该日程识别建议");
-  }catch(e){
-    toast("忽略失败："+e.message);
-  }
-  loadSchedules();
+    const res=await asyncFetch(API+"/customer_schedules/"+scheduleId,{method:"DELETE"});
+    if(res&&res.success){
+      toast("日程已删除");
+      loadSchedules();
+    }else{
+      toast((res&&res.message)||"日程删除失败");
+    }
+  }catch(e){toast("删除失败："+e.message);}
 }
 async function loadRemindPref(){
   if(!TOKEN)return "mid";
@@ -1235,7 +1481,7 @@ function startInterruptPolling(){
   interruptPolling=setInterval(async ()=>{
     if(!TOKEN)return;
     try{
-      const j=await asyncFetch(API+"/get_interrupt");
+      const j=await asyncFetch(API+"/get_interrupt"+(curExt?("?external_id="+encodeURIComponent(curExt)):""));
       if(j.has_interrupt){ pushInterrupt(j); }
     }catch(_){}
   },3000);

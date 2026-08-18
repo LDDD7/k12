@@ -450,6 +450,45 @@ class TagDAO:
             ]
 
     @staticmethod
+    def delete_customer_tags_by_external_id(
+        external_id: str,
+        user_id: Optional[str] = None,
+        data_scope: str = "all",
+        wework_account_id: Optional[str] = None,
+    ) -> int:
+        """删除某客户的全部标签关联（V3.3.2：「清空重置」彻底清除 AI 记忆用，带权限过滤）"""
+        with session_scope(commit=True) as session:
+            subq = session.query(BizCustomerTag.id).join(
+                BizCustomer, BizCustomerTag.external_id == BizCustomer.external_id
+            ).filter(BizCustomerTag.external_id == external_id)
+            if data_scope == "self":
+                if not user_id or not wework_account_id:
+                    return 0
+                subq = subq.filter(
+                    BizCustomer.follow_user_id == user_id,
+                    BizCustomer.wework_account_id == wework_account_id,
+                )
+            elif data_scope == "region":
+                if not wework_account_id:
+                    return 0
+                region_subq = (
+                    select(SysWeworkAccount.region)
+                    .where(SysWeworkAccount.account_id == wework_account_id)
+                    .scalar_subquery()
+                )
+                account_ids = select(SysWeworkAccount.account_id).where(
+                    SysWeworkAccount.region == region_subq
+                )
+                subq = subq.filter(BizCustomer.wework_account_id.in_(account_ids))
+            ids = [r[0] for r in subq.all()]
+            if not ids:
+                return 0
+            result = session.execute(
+                delete(BizCustomerTag).where(BizCustomerTag.id.in_(ids))
+            )
+            return result.rowcount
+
+    @staticmethod
     def get_tag_stats(
         user_id: Optional[str] = None,
         data_scope: str = "all",

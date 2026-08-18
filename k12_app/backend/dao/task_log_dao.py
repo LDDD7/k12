@@ -19,7 +19,9 @@ from k12_app.backend.models import AiTaskLog, AiFeedbackSignal, SysEmployee
 class TaskLogDAO:
     """AI 任务日志数据访问"""
 
-    ACTIONS = {"shown", "adopted", "discarded", "recreated", "confirmed"}
+    # V3.3 二期扩展：新增 fallback（兜底）/ failed（推理失败）/ modified（顾问修改后发送）
+    ACTIONS = {"shown", "adopted", "discarded", "recreated", "confirmed",
+               "fallback", "failed", "modified"}
 
     @staticmethod
     def log_task(
@@ -150,6 +152,51 @@ class TaskLogDAO:
                 "snapshot": r.snapshot,
                 "created_at": r.created_at,
             }
+
+    @staticmethod
+    def get_feedbacks(
+        signal_type: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> Dict:
+        """查询反馈信号列表（V3.3 二期：管理后台反馈汇总）"""
+        with session_scope() as session:
+            query = (
+                session.query(AiFeedbackSignal, AiTaskLog)
+                .outerjoin(AiTaskLog, AiTaskLog.id == AiFeedbackSignal.task_log_id)
+            )
+            if signal_type:
+                query = query.filter(AiFeedbackSignal.signal_type == signal_type)
+            if start_date:
+                query = query.filter(AiFeedbackSignal.created_at >= start_date)
+            if end_date:
+                query = query.filter(AiFeedbackSignal.created_at <= end_date)
+
+            total = session.query(func.count()).select_from(query.subquery()).scalar()
+            rows = (
+                query.order_by(AiFeedbackSignal.created_at.desc())
+                .limit(page_size)
+                .offset((page - 1) * page_size)
+                .all()
+            )
+            items = []
+            for sig, task in rows:
+                item = {
+                    "id": sig.id,
+                    "task_log_id": sig.task_log_id,
+                    "wework_account_id": sig.wework_account_id,
+                    "signal_type": sig.signal_type,
+                    "snapshot": sig.snapshot,
+                    "created_at": sig.created_at,
+                }
+                if task:
+                    item["task_type"] = task.task_type
+                    item["user_id"] = task.user_id
+                    item["external_id"] = task.external_id
+                items.append(item)
+            return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     @staticmethod
     def get_adopt_rate(
@@ -321,3 +368,75 @@ class TaskLogDAO:
                 query = query.filter(AiTaskLog.created_at > after_time)
             rows = query.distinct().limit(limit).all()
             return [r.external_id for r in rows]
+
+    # ==================== 二期指标统计（V3.3） ====================
+
+    @staticmethod
+    def get_phase2_stats(
+        user_id: str,
+        data_scope: str,
+        wework_account_id: Optional[str],
+        days: int = 30,
+    ) -> Dict:
+        """
+        二期验收指标统计：
+        - 第一层知识库：兜底率 = fallback / (shown + fallback)
+        - 第二层综合推理：修改率 = modified / adopted；推理失败率 = failed / shown
+        - 采纳率沿用 get_adopt_rate
+        """
+        cutoff = datetime.now() - timedelta(days=days)
+
+        with session_scope() as session:
+            query = (
+                session.query(
+                    AiTaskLog.task_type,
+                    func.sum(case((AiTaskLog.action == "shown", 1), else_=0)).label("shown"),
+                    func.sum(case((AiTaskLog.action == "adopted", 1), else_=0)).label("adopted"),
+                    func.sum(case((AiTaskLog.action == "discarded", 1), else_=0)).label("discarded"),
+                    func.sum(case((AiTaskLog.action == "fallback", 1), else_=0)).label("fallback"),
+                    func.sum(case((AiTaskLog.action == "failed", 1), else_=0)).label("failed"),
+                    func.sum(case((AiTaskLog.action == "modified", 1), else_=0)).label("modified"),
+                )
+                .filter(AiTaskLog.created_at >= cutoff)
+            )
+            query = apply_scope_conditions(
+                query=query,
+                model=AiTaskLog,
+                data_scope=data_scope,
+                user_id=user_id,
+                wework_account_id=wework_account_id,
+                owner_field="user_id",
+            )
+            rows = query.group_by(AiTaskLog.task_type).all()
+
+            by_type = {}
+            totals = {"shown": 0, "adopted": 0, "discarded": 0, "fallback": 0, "failed": 0, "modified": 0}
+            for r in rows:
+                item = {
+                    "task_type": r.task_type,
+                    "shown": int(r.shown or 0),
+                    "adopted": int(r.adopted or 0),
+                    "discarded": int(r.discarded or 0),
+                    "fallback": int(r.fallback or 0),
+                    "failed": int(r.failed or 0),
+                    "modified": int(r.modified or 0),
+                }
+                by_type[r.task_type] = item
+                for k in totals:
+                    totals[k] += item[k]
+
+            def _rate(num: int, den: int) -> float:
+                return round(100.0 * num / den, 1) if den > 0 else 0.0
+
+            kb_total = totals["shown"] + totals["fallback"]
+            return {
+                "days": days,
+                "totals": {
+                    **totals,
+                    "fallback_rate": _rate(totals["fallback"], kb_total),       # 兜底率
+                    "modify_rate": _rate(totals["modified"], totals["adopted"] + totals["modified"]), # 修改率
+                    "reasoning_fail_rate": _rate(totals["failed"], totals["shown"]),  # 推理失败率
+                    "adopt_rate": _rate(totals["adopted"], totals["adopted"] + totals["discarded"]),
+                },
+                "by_type": by_type,
+            }

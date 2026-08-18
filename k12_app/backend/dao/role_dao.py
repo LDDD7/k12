@@ -164,6 +164,26 @@ class RoleDAO:
         return result.rowcount > 0
 
     @staticmethod
+    def remove_role_any(user_id: str, role_code: str, session=None) -> bool:
+        """删除指定用户某角色的所有关联行（忽略 wework_account_id）"""
+        if session is None:
+            with session_scope(commit=True) as s:
+                result = s.execute(
+                    delete(SysUserRole).where(
+                        SysUserRole.user_id == user_id,
+                        SysUserRole.role_code == role_code,
+                    )
+                )
+                return result.rowcount > 0
+        result = session.execute(
+            delete(SysUserRole).where(
+                SysUserRole.user_id == user_id,
+                SysUserRole.role_code == role_code,
+            )
+        )
+        return result.rowcount > 0
+
+    @staticmethod
     def remove_all_roles(user_id: str, session=None) -> bool:
         if session is None:
             with session_scope(commit=True) as s:

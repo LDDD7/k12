@@ -6,6 +6,9 @@ FastAPI 应用，统一注册 sidebar / admin / rag 三组路由
 详见系统设计文档 三、整体架构 + 十三、项目目录结构
 """
 # k12_app/main.py
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -21,6 +24,7 @@ from k12_app.backend.routes.sidebar import interrupt as sidebar_interrupt
 from k12_app.backend.routes.sidebar import customer as sidebar_customer
 from k12_app.backend.routes.sidebar import preferences as sidebar_preferences
 from k12_app.backend.routes.sidebar import stream as sidebar_stream
+from k12_app.backend.routes.sidebar import feedback as sidebar_feedback
 from k12_app.backend.routes.admin import auth as admin_auth
 from k12_app.backend.routes.admin import employees as admin_employees
 from k12_app.backend.routes.admin import customers as admin_customers
@@ -31,13 +35,45 @@ from k12_app.backend.routes.admin import follow_ups as admin_follow_ups
 from k12_app.backend.routes.admin import organizations as admin_orgs
 from k12_app.backend.routes.admin import roles as admin_roles
 from k12_app.backend.routes.admin import wework_accounts as admin_wework
+from k12_app.backend.routes.admin import ai_config as admin_ai_config
 from k12_app.backend.routes.rag import admin as rag_admin
 from k12_app.backend.routes.rag import search as rag_search
+
+logger = logging.getLogger(__name__)
+
+
+def _startup_auto_index() -> None:
+    """启动后后台补建缺失的向量索引（问题 3 修复）。
+
+    使用 daemon 线程，不阻塞服务启动；任何异常仅告警。
+    """
+    import threading
+
+    def _run():
+        try:
+            from k12_app.backend.rag.index_builder import ensure_indexes_initialized
+            result = ensure_indexes_initialized()
+            built = {k: v.get("doc_count", 0) for k, v in result.items()
+                     if v.get("status") == "success"}
+            logger.info(f"启动自动索引完成，本次补建: {built}")
+        except Exception as e:
+            logger.warning(f"启动自动索引异常（不影响服务）: {e}")
+
+    threading.Thread(target=_run, daemon=True, name="startup-auto-index").start()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if getattr(settings, "AUTO_INDEX_ON_STARTUP", True):
+        _startup_auto_index()
+    yield
+
 
 app = FastAPI(
     title="擎天学智 K12 用户画像推荐系统",
     description="AI 智能销售辅助系统",
     version="3.2",
+    lifespan=lifespan,
 )
 
 # CORS（S-02：收紧为显式配置的来源列表，默认不允许跨域）
@@ -79,6 +115,7 @@ app.include_router(sidebar_interrupt.router, prefix="/api/sidebar", tags=["侧�
 app.include_router(sidebar_customer.router, prefix="/api/sidebar", tags=["侧边栏客户数据"])
 app.include_router(sidebar_preferences.router, prefix="/api/sidebar", tags=["侧边栏偏好"])
 app.include_router(sidebar_stream.router, prefix="/api/sidebar", tags=["侧边栏实时推送"])
+app.include_router(sidebar_feedback.router, prefix="/api/sidebar", tags=["侧边栏反馈"])
 app.include_router(admin_auth.router, prefix="/api/admin", tags=["管理后台认证"])
 app.include_router(admin_employees.router, prefix="/api/admin", tags=["管理后台员工"])
 app.include_router(admin_customers.router, prefix="/api/admin", tags=["管理后台客户"])
@@ -89,6 +126,7 @@ app.include_router(admin_follow_ups.router, prefix="/api/admin", tags=["管理�
 app.include_router(admin_orgs.router, prefix="/api/admin", tags=["管理后台组织"])
 app.include_router(admin_roles.router, prefix="/api/admin", tags=["管理后台角色"])
 app.include_router(admin_wework.router, prefix="/api/admin", tags=["管理后台企微"])
+app.include_router(admin_ai_config.router, prefix="/api/admin/ai", tags=["管理后台二期AI"])
 app.include_router(rag_admin.router, prefix="/api/rag/admin", tags=["RAG索引管理"])
 app.include_router(rag_search.router, prefix="/api/rag", tags=["RAG知识检索"])
 

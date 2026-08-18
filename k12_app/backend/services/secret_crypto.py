@@ -1,5 +1,5 @@
 # k12_app/services/secret_crypto.py
-"""敏感字段加解密（S-08）— 企微 CorpSecret 等存储前加密、读取时解密。
+"""敏感字段加解密 — 企微 CorpSecret 等存储前加密、读取时解密。
 
 使用 Fernet 对称加密，密钥来自 settings.SECRET_ENCRYPTION_KEY。
 解密时对历史明文数据做兼容（非 Fernet token 原样返回）。

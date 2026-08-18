@@ -28,3 +28,8 @@ class RoleService:
     def assign_role(user_id: str, role_code: str, wework_account_id: str = "*") -> bool:
         """分配/修改用户角色"""
         return RoleDAO.assign_role(user_id, role_code, wework_account_id)
+
+    @staticmethod
+    def remove_role(user_id: str, role_code: str) -> bool:
+        """移除用户角色（忽略 wework_account_id，删除该用户该角色的所有关联行）"""
+        return RoleDAO.remove_role_any(user_id, role_code)

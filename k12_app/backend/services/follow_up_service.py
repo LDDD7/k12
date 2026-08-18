@@ -76,6 +76,21 @@ class FollowUpService:
         )
 
     @staticmethod
+    def get_by_id(
+        follow_up_id: int,
+        user_id: str,
+        data_scope: str,
+        wework_account_id: Optional[str],
+    ) -> Optional[Dict]:
+        """按 ID 查询跟进记录（带权限过滤）"""
+        return FollowUpDAO.get_by_id(
+            follow_up_id=follow_up_id,
+            user_id=user_id,
+            data_scope=data_scope,
+            wework_account_id=wework_account_id,
+        )
+
+    @staticmethod
     def exists(follow_up_id: int) -> bool:
         """检查跟进记录是否存在"""
         return FollowUpDAO.exists(follow_up_id)

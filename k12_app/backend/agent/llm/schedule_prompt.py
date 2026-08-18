@@ -10,7 +10,7 @@ from typing import List, Dict
 from datetime import datetime
 
 from k12_app.backend.agent.llm.client import call_llm
-from k12_app.backend.agent.llm.utils import extract_json_list, clean_data_for_json
+from k12_app.backend.agent.llm.utils import extract_json_list, clean_data_for_json, repair_json_with_llm
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,8 @@ SCHEDULE_SYSTEM_PROMPT = """
         "title": "事项名称",
         "start_time": "YYYY-MM-DD HH:MM:SS",
         "priority": "高/中/低",
-        "source": "识别依据（20字以内）"
+        "source": "识别依据（20字以内）",
+        "confirmed": true/false
     },
     ...
 ]
@@ -37,11 +38,12 @@ SCHEDULE_SYSTEM_PROMPT = """
    - 高：试听确认、报名跟进、合同签署
    - 中：回访、资料发送、咨询答疑
    - 低：日常关怀、非紧急提醒
+4. confirmed 判定：客户已明确同意该时间（如"可以/好的/没问题/就这么定/约好了"等确认回应）→ true；仅提到时间或只是顾问提议、客户尚未同意 → false
 
 【示例】
 当前日期：2026-08-11
 输入："这周六带孩子来试听"
-输出：[{"title": "带孩子试听", "start_time": "2026-08-15 00:00:00", "priority": "高", "source": "客户确认这周六试听"}]
+输出：[{"title": "带孩子试听", "start_time": "2026-08-15 00:00:00", "priority": "高", "source": "客户确认这周六试听", "confirmed": true}]
 """
 
 
@@ -52,6 +54,8 @@ def _validate_schedule(item: dict) -> bool:
         return False
     if item.get("priority") not in {"高", "中", "低"}:
         return False
+    # 兼容模型未返回 confirmed 的情况
+    item.setdefault("confirmed", False)
     return True
 
 
@@ -87,8 +91,13 @@ def extract_schedule(chat_records: List[Dict]) -> List[Dict]:
 """
 
     try:
-        raw_response = call_llm(SCHEDULE_SYSTEM_PROMPT, user_content, temperature=0.3)
+        # 中文场景 max_tokens 过小易截断 JSON：给足空间，解析失败时用 LLM 修复原文
+        raw_response = call_llm(SCHEDULE_SYSTEM_PROMPT, user_content, temperature=0.3, max_tokens=1500)
         data = extract_json_list(raw_response)
+
+        if not data:
+            logger.warning(f"日程识别返回无效 JSON，尝试 LLM 修复: {raw_response[:120]}")
+            data = repair_json_with_llm(raw_response, expect_list=True, max_tokens=1500)
 
         if data and isinstance(data, list):
             valid_items = []

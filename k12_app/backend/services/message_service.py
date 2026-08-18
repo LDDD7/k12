@@ -102,8 +102,20 @@ class MessageService:
         receiver_name: Optional[str] = None,
         send_time: Optional[datetime] = None,
     ) -> bool:
-        """插入企微聊天消息（自动生成 msg_id / sorted_key / msg_date）"""
+        """插入企微聊天消息（自动生成 msg_id / sorted_key / msg_date）
+
+        去重：顾问发送内容若与会话内客户已有消息完全一致（复制客户原话再发一遍），
+        不重复入库，避免聊天记录出现归属错乱的重复条。
+        """
         now = send_time or datetime.now()
+        if sender == user_id and content:
+            try:
+                if MessageDAO.customer_message_exists_with_content(
+                    user_id=user_id, external_id=external_id, content=content
+                ):
+                    return False
+            except Exception:
+                pass
         return MessageDAO.insert_chat_message(
             msg_id=uuid.uuid4().hex,
             sorted_key=MessageDAO.generate_sorted_key(user_id, external_id),

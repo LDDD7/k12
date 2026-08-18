@@ -38,7 +38,8 @@ main{max-width:1360px;margin:0 auto;padding:16px 22px 44px}
 .acontent{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:22px;overflow:auto;min-height:540px}
 .acontent h2{font-size:19px;margin-bottom:4px}
 .acontent .sub{color:var(--ink-3);font-size:12px;margin-bottom:16px}
-.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px}
+@media(max-width:900px){.kpis{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:760px){.kpis{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr!important}}
 .kpi{background:var(--bg);border-radius:10px;padding:14px;border:1px solid transparent;transition:.15s}
 .kpi:hover{border-color:var(--line);box-shadow:var(--shadow)}
@@ -49,13 +50,12 @@ main{max-width:1360px;margin:0 auto;padding:16px 22px 44px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
 .box{background:var(--bg);border-radius:10px;padding:14px}
 .box h3{font-size:13px;margin-bottom:12px}
-.funnel{display:flex;flex-direction:column;align-items:center;padding:6px 0 2px}
-.funnel .fstep{display:flex;flex-direction:column;align-items:center;width:100%;margin-bottom:2px}
-.funnel .fshape{height:48px;display:flex;align-items:center;justify-content:center;gap:10px;color:#fff;font-weight:600;clip-path:polygon(0 0,100% 0,calc(100% - 18px) 100%,18px 100%);filter:drop-shadow(0 3px 6px rgba(20,30,60,.16))}
-.funnel .fname{font-size:13px;font-weight:600;letter-spacing:.5px}
-.funnel .fcnt{font-size:17px;font-weight:700}
-.funnel .funit{font-size:11px;font-weight:400;opacity:.85;margin-left:2px}
-.funnel .fconv{font-size:11px;color:var(--ink-2);background:var(--bg);border:1px solid var(--line);padding:2px 10px;border-radius:10px;margin:6px 0;line-height:1.4}
+.eff{padding:7px 2px}
+.eff-top{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.eff-name{font-size:13px;font-weight:600;color:var(--ink);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.eff-num{font-size:12px;color:var(--ink-2);white-space:nowrap}
+.eff-bar{height:14px;border-radius:7px;background:var(--bg);overflow:hidden}
+.eff-fill{height:100%;border-radius:7px;min-width:6px;transition:width .4s ease}
 .donut-wrap{display:flex;align-items:center;gap:16px}
 .donut{width:150px;height:150px;flex-shrink:0}
 .dcnt{font-size:26px;font-weight:700;fill:var(--ink);text-anchor:middle}
@@ -208,6 +208,8 @@ table.tbl tr:last-child td{border-bottom:none}
       <div class="aitem" data-page="followup" onclick="adminPage('followup')"><span class="ico">📝</span>跟进记录</div>
       <div class="aitem" data-page="tagm" onclick="adminPage('tagm')"><span class="ico">🏷️</span>标签管理</div>
       <div class="aitem" data-page="sched" onclick="adminPage('sched')"><span class="ico">📅</span>日程管理</div>
+      <div class="aitem" data-page="kb" onclick="adminPage('kb')"><span class="ico">📚</span>资料库管理</div>
+      <div class="aitem" data-page="aiset" onclick="adminPage('aiset')"><span class="ico">🧠</span>AI 设置</div>
       <div class="aitem" data-page="perms" onclick="adminPage('perms')"><span class="ico">🔐</span>权限与组织</div>
     </div>
     <div class="acontent" id="acontent">
@@ -251,6 +253,7 @@ let custFilter = "全部阶段";
 /* ===================== 工具 ===================== */
 function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");clearTimeout(window._tt);window._tt=setTimeout(()=>t.classList.remove("show"),2500);}
 function escapeHtml(s){if(s==null)return"";return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));}
+function jsStr(s){if(s==null)return"";return String(s).replace(/["'&<>\\\r\n]/g,function(m){if(m==='"')return"\\x22";if(m==="'")return"\\x27";if(m==="&")return"\\x26";if(m==="<")return"\\x3c";if(m===">")return"\\x3e";if(m==="\\")return"\\\\";return"\\n";});}
 function fmtDate(s){if(!s)return"—";return String(s).replace("T"," ").replace(".000","").slice(0,16);}
 async function apiFetch(path,opts){
   opts=opts||{};
@@ -264,6 +267,7 @@ async function apiFetch(path,opts){
   return j.data;
 }
 function permBadgeFor(scope){if(scope==="all")return["super","🔑 全量数据"];if(scope==="region")return["region","📊 本区域"];return["normal","👤 本名下"];}
+function isSuperAdmin(){return !!(CUR_ADMIN&&((CUR_ADMIN.role_codes||[]).indexOf("super_admin")>=0||CUR_ADMIN.data_scope==="all"));}
 
 /* ===================== 登录 / 登出 ===================== */
 async function doLogin(){
@@ -300,7 +304,7 @@ async function doLogout(){
 /* ===================== 页面调度 ===================== */
 function adminPage(page){
   document.querySelectorAll(".anav .aitem").forEach(b=>b.classList.toggle("active",b.dataset.page===page));
-  const pages={dash:pageDash,emp:pageEmp,cust:pageCust,order:pageOrder,followup:pageFollowup,tagm:pageTag,sched:pageSchedule,perms:pagePermOrg};
+  const pages={dash:pageDash,emp:pageEmp,cust:pageCust,order:pageOrder,followup:pageFollowup,tagm:pageTag,sched:pageSchedule,perms:pagePermOrg,kb:pageKb,aiset:pageAiSet};
   pages[page]();
 }
 
@@ -326,27 +330,18 @@ function renderDonut(el, data, centerLabel){
   el.innerHTML='<div class="donut-wrap"><svg viewBox="0 0 160 160" class="donut"><g transform="rotate(-90 80 80)">'+segs+'</g><text x="80" y="76" class="dcnt">'+total+'</text><text x="80" y="96" class="dlbl">'+(centerLabel||"总数")+'</text></svg><div class="dlegend">'+legend+'</div></div>';
 }
 
-function renderFunnel(el, steps, colors){
-  var arr=(steps||[]).filter(function(s){return (s.count||0)>0;});
-  if(!arr.length){el.innerHTML="<div class='hint'>暂无数据</div>";return;}
-  var max=Math.max.apply(null,arr.map(function(s){return s.count||0;}).concat([1]));
-  var html='<div class="funnel">';
-  arr.forEach(function(s,i){
-    var cnt=s.count||0;
-    var w=Math.max(Math.round(cnt/max*100),20);
-    var color=(colors&&colors[i])||CHART_PALETTE[i%CHART_PALETTE.length];
-    var bg='linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0) 42%, rgba(0,0,0,.06)), '+color;
-    html+='<div class="fstep">';
-    html+='<div class="fshape" style="width:'+w+'%;background:'+bg+'"><span class="fname">'+escapeHtml(s.name||"")+'</span><b class="fcnt">'+cnt+'</b><span class="funit">人</span></div>';
-    if(i>0){
-      var prev=arr[i-1].count||0;
-      var rate=prev>0?Math.round(cnt/prev*100):0;
-      html+='<div class="fconv">↓ 转化 '+rate+'%</div>';
-    }
-    html+='</div>';
-  });
-  html+='</div>';
-  el.innerHTML=html;
+function renderEffBars(el, items){
+  var arr=(items||[]).filter(function(d){return d.completed_count>0||d.order_count>0;});
+  if(!arr.length){el.innerHTML="<div class='hint'>暂无顾问业绩数据</div>";return;}
+  var max=Math.max.apply(null,arr.map(function(d){return d.completed_count||0;}).concat([1]));
+  var rows=arr.map(function(d,i){
+    var color=CHART_PALETTE[i%CHART_PALETTE.length];
+    var w=Math.max(Math.round((d.completed_count||0)/max*100),6);
+    var amt=(d.total_amount||0).toLocaleString();
+    return '<div class="eff"><div class="eff-top"><span class="eff-name" title="'+escapeHtml(d.advisor_name||d.user_id||"—")+'">'+escapeHtml(d.advisor_name||d.user_id||"—")+'</span><span class="eff-num">成单 '+d.completed_count+' · ¥'+amt+'</span></div>'+
+      '<div class="eff-bar"><div class="eff-fill" style="width:'+w+'%;background:linear-gradient(90deg,'+color+',rgba(0,0,0,.15) 160%),'+color+'"></div></div></div>';
+  }).join("");
+  el.innerHTML=rows;
 }
 
 async function pageDash(){
@@ -367,6 +362,7 @@ async function pageDash(){
   }catch(_){}
   a.innerHTML=`<h2>📊 数据看板</h2><div class="sub">${roleLbl} 视图 · 数据实时刷新</div>
     <div class="kpis">
+      <div class="kpi"><div class="l">🎯 最终客户转化率</div><div class="v" id="kpiConv">—</div><div class="d">在读 ÷ 潜在</div></div>
       <div class="kpi"><div class="l">👥 客户总数</div><div class="v">${totalCusts}</div><div class="d up">权限内可见</div></div>
       <div class="kpi"><div class="l">🧾 订单总数</div><div class="v">${totalOrders}</div><div class="d">本视图</div></div>
       <div class="kpi"><div class="l">💰 累计订单金额</div><div class="v">¥${revenue.toLocaleString()}</div><div class="d">权限内统计</div></div>
@@ -377,7 +373,7 @@ async function pageDash(){
       <div class="box"><h3>线索来源分布</h3><div id="leadBar">加载中…</div></div>
     </div>
     <div class="grid2">
-      <div class="box"><h3>转化漏斗</h3><div id="funnelDiv">加载中…</div></div>
+      <div class="box"><h3>顾问人效 TOP<i class="tip" data-tip="按已完结（成单）订单数排名，展示每位顾问的成单数与累计成交金额">ⓘ</i></h3><div id="effDiv">加载中…</div></div>
       <div class="box"><h3>AI 采纳率<i class="tip" data-tip="采纳率 = 采纳 ÷（采纳 + 丢弃）× 100%。只有顾问对 AI 建议做出「采纳」或「丢弃」决定后才计入，仅展示未决定的（shown）不参与计算。">ⓘ</i></h3><div id="adoptDiv">加载中…</div></div>
     </div>
     <div class="permnote">当前「${roleLbl}」视图：${scope==="all"?"可查看全部企微账户数据并配置权限":scope==="region"?"仅可见本区域数据":"仅可见本人名下客户数据"}</div>`;
@@ -402,10 +398,12 @@ async function pageDash(){
   }catch(e){document.getElementById("leadBar").innerHTML='<div class="hint">'+escapeHtml(e.message)+'</div>';}
   try{
     var f=await apiFetch(API+"/dashboard/funnel");
-    var steps=(f&&f.steps)||(Array.isArray(f)?f:[]);
-    var funnelColors=["#1F6FFF","#7B61FF","#FF9F0A","#07C160"];
-    renderFunnel(document.getElementById("funnelDiv"),steps,funnelColors);
-  }catch(e){document.getElementById("funnelDiv").innerHTML='<div class="hint">'+escapeHtml(e.message)+'</div>';}
+    document.getElementById("kpiConv").textContent=(f&&f.conversion_rate!=null? f.conversion_rate+"%" : "—");
+  }catch(e){document.getElementById("kpiConv").textContent="—";}
+  try{
+    var eff=await apiFetch(API+"/dashboard/advisor_efficiency?limit=5");
+    renderEffBars(document.getElementById("effDiv"),eff);
+  }catch(e){document.getElementById("effDiv").innerHTML='<div class="hint">'+escapeHtml(e.message)+'</div>';}
   try{
     var t=await apiFetch(API+"/dashboard/adopt_rate");
     var byUser=(t&&t.by_user)||(Array.isArray(t)?t:[]);
@@ -451,6 +449,7 @@ async function loadEmpTable(){
       var wwName=e.wework_account_name||"";
       var companyName=wwName.split(/[·\-]/)[0]||wwName;
       var accountDisplay=companyName?companyName+"-"+e.name:"—";
+      var permBtn=isSuperAdmin()?`<button class="btn btn-ghost btn-sm" onclick="assignRoles('${jsStr(e.user_id)}','${jsStr(e.name)}','${jsStr(e.wework_account_id||"")}')">分配权限</button> `:"";
       return `<tr>
       <td>${escapeHtml(e.user_id)}</td>
       <td>${escapeHtml(e.name)}</td>
@@ -458,7 +457,7 @@ async function loadEmpTable(){
       <td>${escapeHtml(e.dept||"—")}</td>
       <td style="font-size:12px">${escapeHtml(accountDisplay)}</td>
       <td><span class="status ${e.binding_status==="bound"?"s-ok":"s-wait"}">${e.binding_status==="bound"?"已绑定":"待绑定"}</span></td>
-      <td><button class="btn btn-ghost btn-sm" onclick="viewEmpCusts('${escapeHtml(e.user_id)}','${escapeHtml(e.name)}')">名下客户</button> <button class="btn btn-ghost btn-sm" onclick="showEditEmp('${escapeHtml(e.user_id)}','${escapeHtml(e.name)}','${escapeHtml(e.dept||"")}','${escapeHtml(wwName)}')">编辑</button> ${e.binding_status!=="bound"?`<button class="btn btn-ghost btn-sm" onclick="showBindWework('${escapeHtml(e.user_id)}')">绑定企微</button> `:""}<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteEmp('${escapeHtml(e.user_id)}','${escapeHtml(e.name)}')">删除</button></td>
+      <td>${permBtn}<button class="btn btn-ghost btn-sm" onclick="viewEmpCusts('${jsStr(e.user_id)}','${jsStr(e.name)}')">名下客户</button> <button class="btn btn-ghost btn-sm" onclick="showEditEmp('${jsStr(e.user_id)}','${jsStr(e.name)}','${jsStr(e.dept||"")}','${jsStr(wwName)}')">编辑</button> ${e.binding_status!=="bound"?`<button class="btn btn-ghost btn-sm" onclick="showBindWework('${jsStr(e.user_id)}')">绑定企微</button> `:""}<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteEmp('${jsStr(e.user_id)}','${jsStr(e.name)}')">删除</button></td>
     </tr>`;
     }).join("");
   }catch(e){tb.innerHTML=`<tr><td colspan="7" style="color:var(--red)">${escapeHtml(e.message)}</td></tr>`;}
@@ -539,7 +538,7 @@ async function showEditEmp(uid,name,dept,areaName){
     '<div class="field"><label>姓名</label><input id="editEmpName" value="'+escapeHtml(name)+'"></div>'+
     '<div class="field"><label>所属片区</label><select id="editEmpArea" onchange="onEditAreaChange()"><option value="">请选择</option>'+areaOpts+'</select></div>'+
     '<div class="field"><label>部门</label><div style="display:flex;align-items:center;gap:4px"><span id="editEmpDeptPrefix" style="color:var(--ink-2);font-size:13px;white-space:nowrap">'+escapeHtml(currentRegionPrefix)+'</span><input id="editEmpDeptSuffix" value="'+escapeHtml(currentSuffix)+'" placeholder="如 深圳一组"></div></div>'+
-    '<div class="form-actions"><button class="btn btn-ghost" onclick="closeObjModal()">取消</button><button class="btn btn-blue" onclick="saveEditEmp(\''+escapeHtml(uid)+'\')">保存修改</button></div></div>');
+    '<div class="form-actions"><button class="btn btn-ghost" onclick="closeObjModal()">取消</button><button class="btn btn-blue" onclick="saveEditEmp(\''+jsStr(uid)+'\')">保存修改</button></div></div>');
 }
 function onEditAreaChange(){
   var areaId=document.getElementById("editEmpArea").value;
@@ -571,7 +570,7 @@ async function showBindWework(uid){
   openObjModal("绑定企微账户 — "+uid,
     '<div class="form-grid">'+
     '<div class="field fspan2"><label>选择企微账户<span class="req">*</span></label><select id="bindWwSelect"><option value="">请选择</option>'+opts+'</select></div>'+
-    '<div class="form-actions"><button class="btn btn-ghost" onclick="closeObjModal()">取消</button><button class="btn btn-blue" onclick="bindWework(\''+escapeHtml(uid)+'\')">确认绑定</button></div></div>');
+    '<div class="form-actions"><button class="btn btn-ghost" onclick="closeObjModal()">取消</button><button class="btn btn-blue" onclick="bindWework(\''+jsStr(uid)+'\')">确认绑定</button></div></div>');
 }
 async function bindWework(uid){
   var ww=document.getElementById("bindWwSelect").value;
@@ -593,6 +592,39 @@ async function attachRoles(uid){
     const r=await apiFetch(API+"/user_roles/"+encodeURIComponent(uid));
     openObjModal(`${uid} 的角色分配`,Array.isArray(r)?`<div>${r.map(x=>`<div class="kv"><span class="k">${escapeHtml(x.role_code||"")}</span><span class="v">${escapeHtml(x.wework_account_id||"")}</span></div>`).join("")}</div>`:JSON.stringify(r));
   }catch(e){openObjModal("错误",e.message);}
+}
+async function assignRoles(uid,name,wwid){
+  try{
+    const roles=await apiFetch(API+"/roles");
+    const cur=await apiFetch(API+"/user_roles/"+encodeURIComponent(uid));
+    var curCodes=[].concat((Array.isArray(cur)?cur:[]).map(x=>x.role_code)).filter(function(v,i,a){return a.indexOf(v)===i;});
+    var opts=(roles||[]).map(r=>{
+      var checked=curCodes.indexOf(r.role_code)>=0?" checked":"";
+      var selfSuper=(uid===CUR_ADMIN.user_id&&r.role_code==="super_admin");
+      var dis=selfSuper?" disabled":"";
+      return '<label style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--line)"><input type="checkbox" class="assignRoleChk" data-code="'+escapeHtml(r.role_code)+'"'+checked+dis+'><b>'+escapeHtml(r.role_name||r.role_code)+'</b><span class="hint">('+escapeHtml(r.data_scope||"")+')'+(selfSuper?" · 不可移除自身超管":'')+'</span></label>';
+    }).join("");
+    window._assignRoleTarget={uid:uid,wwid:wwid||"*"};
+    openObjModal("分配权限 — "+name, (opts||"<div class='hint'>暂无角色</div>")+'<div class="form-actions"><button class="btn btn-ghost" onclick="closeObjModal()">取消</button><button class="btn btn-blue" onclick="saveAssignRoles()">保存权限</button></div>', "lg");
+  }catch(e){openObjModal("错误",e.message);}
+}
+async function saveAssignRoles(){
+  var t=window._assignRoleTarget;
+  if(!t)return;
+  var checked=document.querySelectorAll(".assignRoleChk");
+  var sel=[];
+  for(var k=0;k<checked.length;k++){if(checked[k].checked)sel.push(checked[k].getAttribute("data-code"));}
+  try{
+    var cur=await apiFetch(API+"/user_roles/"+encodeURIComponent(t.uid));
+    var curCodes=[].concat((Array.isArray(cur)?cur:[]).map(x=>x.role_code)).filter(function(v,i,a){return a.indexOf(v)===i;});
+    for(var i=0;i<sel.length;i++){
+      if(curCodes.indexOf(sel[i])<0)await apiFetch(API+"/user_roles",{method:"POST",body:JSON.stringify({user_id:t.uid,role_code:sel[i],wework_account_id:t.wwid})});
+    }
+    for(var j=0;j<curCodes.length;j++){
+      if(sel.indexOf(curCodes[j])<0)await apiFetch(API+"/user_roles/"+encodeURIComponent(t.uid)+"/"+encodeURIComponent(curCodes[j]),{method:"DELETE"});
+    }
+    closeObjModal(); toast("权限已更新 ✓");
+  }catch(e){toast("保存失败："+e.message);}
 }
 
 /* ===================== 客户管理 ===================== */
@@ -620,12 +652,12 @@ async function loadCustTable(page=1){
     const j=await apiFetch(url);
     const items=j.items||[]; const total=j.total||items.length;
     if(items.length===0){tb.innerHTML=`<tr><td colspan="8" class='hint'>权限内暂无客户</td></tr>`;document.getElementById("custPager").innerHTML="";return;}
-    tb.innerHTML=items.map(c=>`<tr style="cursor:pointer" onclick="openCust('${escapeHtml(c.external_id)}','${escapeHtml(c.follow_user_id||"")}')">
+    tb.innerHTML=items.map(c=>`<tr style="cursor:pointer" onclick="openCust('${jsStr(c.external_id)}','${jsStr(c.follow_user_id||"")}')">
       <td>${escapeHtml(c.external_id||"")}</td><td>${escapeHtml(c.name||"")}</td><td>${escapeHtml(c.child_name||"")}</td>
       <td>${escapeHtml(c.grade||"")}</td><td>${escapeHtml(c.focus_subject||"")}</td>
       <td><span class="status ${c.stage==="高意向"?"s-wait":c.stage==="在读"?"s-ok":"s-off"}">${escapeHtml(c.stage||"—")}</span></td>
       <td>${escapeHtml(c.follow_user_id||"—")}</td>
-      <td><button class="btn btn-blue btn-sm" onclick="event.stopPropagation();openCust('${escapeHtml(c.external_id)}','${escapeHtml(c.follow_user_id||"")}')">查看 →</button></td>
+      <td><button class="btn btn-blue btn-sm" onclick="event.stopPropagation();openCust('${jsStr(c.external_id)}','${jsStr(c.follow_user_id||"")}')">查看 →</button></td>
     </tr>`).join("");
     const total_pages=Math.max(1,Math.ceil(total/20));
     let pager=""; for(let i=1;i<=Math.min(total_pages,8);i++){pager+=`<button class="${page===i?'active':''}" onclick="loadCustTable(${i})">${i}</button>`;}
@@ -655,7 +687,7 @@ async function openCust(ext,uid){
       </div>
       <div class="dsec">
         <div class="dsec-title"><span class="fico">👤</span>基本信息</div>
-        <div class="kv-grid">
+        <div class="box" style="padding:10px 14px">
           <div class="kv"><span class="k">客户ID</span><span class="v">${escapeHtml(c.external_id||"—")}</span></div>
           <div class="kv"><span class="k">负责顾问</span><span class="v">${escapeHtml(c.follow_user_id||"—")}</span></div>
           <div class="kv"><span class="k">客户阶段</span><span class="v">${escapeHtml(c.stage||"—")}</span></div>
@@ -712,7 +744,7 @@ async function loadTagPicker(ext){
     if(!flat.length){box.innerHTML='<div class="hint">标签库为空，请先在「标签管理」中创建标签</div>';return;}
     box.innerHTML='<div style="max-height:320px;overflow:auto">'+flat.map(function(t){
       var used=existing.indexOf(t.tag_id)>=0;
-      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--line)"><div><div style="font-size:13px">'+escapeHtml(t.tag_name)+'</div><div class="hint">'+escapeHtml(t.group_name||"")+' · '+escapeHtml(t.tag_id)+'</div></div>'+(used?'<span style="color:var(--ink-3);font-size:12px">已添加</span>':'<button class="btn btn-blue btn-sm" onclick="addTagToCustomer(\''+escapeHtml(t.tag_id)+'\',\''+escapeHtml(t.tag_name)+'\')">添加</button>')+'</div>';
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--line)"><div><div style="font-size:13px">'+escapeHtml(t.tag_name)+'</div><div class="hint">'+escapeHtml(t.group_name||"")+' · '+escapeHtml(t.tag_id)+'</div></div>'+(used?'<span style="color:var(--ink-3);font-size:12px">已添加</span>':'<button class="btn btn-blue btn-sm" onclick="addTagToCustomer(\''+jsStr(t.tag_id)+'\',\''+jsStr(t.tag_name)+'\')">添加</button>')+'</div>';
     }).join("")+'</div>';
   }catch(e){box.innerHTML='<div style="color:var(--red)">'+escapeHtml(e.message)+'</div>';}
 }
@@ -835,7 +867,7 @@ async function submitCreateOrder(){
 
 /* ===================== 跟进记录 ===================== */
 var _followUps=[];
-const FU_TYPES=["电话","试听","线下面谈","外勤","外勤拜访","其他"];
+const FU_TYPES=["电话","试听","线下面谈","外勤","其他"];
 const FU_RESULTS=["已联系","未接通","改期","已到店","已试听","已成交","拒绝","有效联系","有意向","无意向","待跟进"];
 function fuOpts(list,cur,allowEmpty){
   var h="";
@@ -1001,7 +1033,7 @@ async function viewTagCustomers(idx){
     if(!customers||!customers.length){div.innerHTML='<div class="hint">标签「'+escapeHtml(tagName)+'」暂无关联客户</div>';return;}
     var html='<div class="sect">标签「'+escapeHtml(tagName)+'」关联客户 ('+customers.length+')</div><table class="tbl"><thead><tr><th>客户ID</th><th>客户名</th><th>来源</th><th>状态</th><th>操作</th></tr></thead><tbody>';
     customers.forEach(function(c){
-      html+='<tr><td>'+escapeHtml(c.external_id||"—")+'</td><td>'+escapeHtml(c.customer_name||"—")+'</td><td>'+escapeHtml(c.source||"—")+'</td><td>'+(c.confirmed?'<span style="color:var(--green)">已确认</span>':'<span style="color:var(--ink-3)">待确认</span>')+'</td><td><button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="removeTagCustomer(\''+escapeHtml(tagId)+'\',\''+escapeHtml(c.external_id||"")+'\')">移除</button></td></tr>';
+      html+='<tr><td>'+escapeHtml(c.external_id||"—")+'</td><td>'+escapeHtml(c.customer_name||"—")+'</td><td>'+escapeHtml(c.source||"—")+'</td><td>'+(c.confirmed?'<span style="color:var(--green)">已确认</span>':'<span style="color:var(--ink-3)">待确认</span>')+'</td><td><button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="removeTagCustomer(\''+jsStr(tagId)+'\',\''+jsStr(c.external_id||"")+'\')">移除</button></td></tr>';
     });
     html+='</tbody></table>';
     div.innerHTML=html;
@@ -1072,11 +1104,11 @@ async function pagePermOrg(){
       <div class="box"><h3>企微账户（wework_accounts）</h3><div id="wwDiv">加载中…</div></div>
     </div>
     <div class="sect">隐私与安全合规（5.2）</div>
-    <div class="box"><div class="kv"><span class="k">数据脱敏</span><span class="v">历史聊天样本脱敏后用于 AI 训练（N8）</span></div>
-      <div class="kv"><span class="k">访问控制</span><span class="v">客户信息访问权限严格（N6）</span></div>
-      <div class="kv"><span class="k">未成年人保护</span><span class="v">最小必要原则，符合《个保法》（N9）</span></div>
-      <div class="kv"><span class="k">数据所有权</span><span class="v">数据归甲方，仅用于本系统（N10）</span></div>
-      <div class="kv"><span class="k">AI 服务隔离</span><span class="v">AI 独立部署，异常不影响企微主流程（N11/N19）</span></div></div>`;
+    <div class="box"><div class="kv"><span class="k">数据脱敏</span><span class="v">历史聊天样本脱敏后用于 AI 训练</span></div>
+      <div class="kv"><span class="k">访问控制</span><span class="v">客户信息访问权限严格</span></div>
+      <div class="kv"><span class="k">未成年人保护</span><span class="v">最小必要原则，符合《个保法》</span></div>
+      <div class="kv"><span class="k">数据所有权</span><span class="v">数据归甲方，仅用于本系统</span></div>
+      <div class="kv"><span class="k">AI 服务隔离</span><span class="v">AI 独立部署，异常不影响企微主流程</span></div></div>`;
   try{
     const o=await apiFetch(API+"/organizations");
     const items=Array.isArray(o)?o:(o.items||[]);
@@ -1091,12 +1123,13 @@ async function pagePermOrg(){
 
 
 /* ===================== 日程管理 ===================== */
-var _schedData=[]; var _calYear,_calMonth,_calSelected;
+var _schedData=[]; var _calYear,_calMonth,_calSelected,_dayScheds=[];
 async function pageSchedule(){
   const a=document.getElementById("acontent");
   var now=new Date();
   _calYear=now.getFullYear(); _calMonth=now.getMonth()+1; _calSelected=null;
   a.innerHTML=`<h2>📅 日程管理</h2><div class="sub">日历视图 · 点击日期查看当天日程（权限：${CUR_ADMIN.data_scope}）</div>
+    <div style="margin-bottom:10px"><button class="btn btn-blue btn-sm" onclick="showCreateSched()">＋ 新增日程</button></div>
     <div class="cal-nav"><button class="btn btn-ghost btn-sm" onclick="navCal(-1)">◀</button><span class="mn" id="calLabel"></span><button class="btn btn-ghost btn-sm" onclick="navCal(1)">▶</button></div>
     <table class="calendar"><thead><tr><th>日</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th></tr></thead><tbody id="calBody"></tbody></table>
     <div id="dayDetail" class="day-detail"><div class="hint">点击日历中的日期查看当天日程安排</div></div>`;
@@ -1107,6 +1140,7 @@ async function loadSchedData(){
     const j=await apiFetch(API+"/schedules");
     _schedData=(j.items||[]);
     renderCalendar();
+    if(_calSelected)showDayScheds(_calSelected);
   }catch(e){document.getElementById("calBody").innerHTML='<tr><td colspan="7" style="color:var(--red)">'+escapeHtml(e.message)+'</td></tr>';}
 }
 function navCal(dir){
@@ -1164,7 +1198,7 @@ function renderCalendar(){
       if(hasEvents&&!c.other){
         dots='<div class="dots">'+map[c.dateStr].slice(0,3).map(function(s){return '<span class="dot'+(s.priority==='高'?' hi':'')+'"></span>';}).join('')+'</div>';
       }
-      html+='<td class="'+cls.join(' ')+'"'+(c.other?'':' onclick="showDayScheds(\''+c.dateStr+'\')"')+'><span class="dnum">'+c.day+'</span>'+dots+'</td>';
+      html+='<td class="'+cls.join(' ')+'"'+(c.other?'':' onclick="showDayScheds(\''+jsStr(c.dateStr)+'\')"')+'><span class="dnum">'+c.day+'</span>'+dots+'</td>';
     });
     html+='</tr>';
   });
@@ -1174,17 +1208,79 @@ function showDayScheds(dateStr){
   _calSelected=dateStr;
   renderCalendar();
   var items=_schedData.filter(function(s){return (s.start_time||"").slice(0,10)===dateStr;});
+  _dayScheds=items;
   var div=document.getElementById("dayDetail");
   if(items.length===0){
     div.innerHTML='<h3>'+dateStr+'</h3><div class="hint">当天暂无日程安排</div>';
     return;
   }
   var prioMap={'高':'🔴 高','中':'🟡 中','低':'🟢 低'};
-  div.innerHTML='<h3>'+dateStr+' · '+items.length+' 项日程</h3>'+items.map(function(s){
+  div.innerHTML='<h3>'+dateStr+' · '+items.length+' 项日程</h3>'+items.map(function(s,i){
     var status=s.status||'待确认';
     var stCls=status==='已确认'?'s-ok':(status==='已取消'?'s-off':'s-wait');
-    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line)"><div><strong>'+escapeHtml(s.title||'—')+'</strong><div class="hint" style="margin-top:2px">'+escapeHtml(s.customer_name||'—')+' · '+escapeHtml(s.external_id||'')+'</div></div><div style="text-align:right"><span class="status '+stCls+'">'+escapeHtml(status)+'</span><div class="hint" style="margin-top:2px">'+(prioMap[s.priority]||s.priority||'—')+'</div><div class="hint">'+escapeHtml(fmtDate(s.start_time))+' — '+escapeHtml(fmtDate(s.end_time))+'</div></div></div>';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line)"><div><strong>'+escapeHtml(s.title||'—')+'</strong><div class="hint" style="margin-top:2px">'+escapeHtml(s.customer_name||'—')+' · '+escapeHtml(s.external_id||'')+'</div></div><div style="text-align:right"><span class="status '+stCls+'">'+escapeHtml(status)+'</span><div class="hint" style="margin-top:2px">'+(prioMap[s.priority]||s.priority||'—')+'</div><div class="hint">'+escapeHtml(fmtDate(s.start_time))+' — '+escapeHtml(fmtDate(s.end_time))+'</div><div style="margin-top:6px"><button class="btn btn-ghost btn-sm" onclick="editSched('+i+')">编辑</button> <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="delSched('+i+')">删除</button></div></div></div>';
   }).join('');
+}
+/* ---- 日程新增 ---- */
+function showCreateSched(){
+  openObjModal("新增日程", `
+    <div class="form-grid">
+      <div class="field"><label>客户ID<span class="req">*</span></label><input id="cs_ext" placeholder="如 C10001"></div>
+      <div class="field"><label>标题<span class="req">*</span></label><input id="cs_title" placeholder="如 试听课邀约"></div>
+      <div class="field"><label>开始时间<span class="req">*</span></label><input id="cs_start" type="datetime-local"></div>
+      <div class="field"><label>结束时间</label><input id="cs_end" type="datetime-local"></div>
+      <div class="field fspan2"><label>优先级</label><select id="cs_prio">${["高","中","低"].map(x=>`<option>${x}</option>`).join("")}</select></div>
+      <div class="form-actions"><button class="btn btn-ghost" onclick="closeObjModal()">取消</button><button class="btn btn-blue" onclick="submitCreateSched()">创建日程</button></div>
+    </div>`);
+}
+async function submitCreateSched(){
+  var ext=document.getElementById("cs_ext").value.trim();
+  var title=document.getElementById("cs_title").value.trim();
+  var start=document.getElementById("cs_start").value;
+  if(!ext||!title||!start){toast("请填写客户ID、标题和开始时间");return;}
+  try{
+    var body={external_id:ext,title:title,start_time:start,priority:document.getElementById("cs_prio").value};
+    var end=document.getElementById("cs_end").value;
+    if(end)body.end_time=end;
+    await apiFetch(API+"/schedules",{method:"POST",body:JSON.stringify(body)});
+    closeObjModal(); toast("日程已添加（待确认）✓"); loadSchedData();
+  }catch(e){toast("创建失败："+e.message);}
+}
+/* ---- 日程编辑 / 删除 ---- */
+function editSched(i){
+  var s=_dayScheds[i]; if(!s)return;
+  var st=s.status||"待确认";
+  var stOpts=["待确认","已确认","已完成","已取消"].map(x=>`<option value="${x}" ${x===st?"selected":""}>${x}</option>`).join("");
+  openObjModal("编辑日程",
+    '<div class="form-grid">'+
+    '<div class="field fspan2"><label>标题</label><input id="es_title" value="'+escapeHtml(s.title||"")+'"></div>'+
+    '<div class="field"><label>开始时间</label><input id="es_start" type="datetime-local" value="'+((s.start_time||"").slice(0,16))+'"></div>'+
+    '<div class="field"><label>结束时间</label><input id="es_end" type="datetime-local" value="'+((s.end_time||"").slice(0,16))+'"></div>'+
+    '<div class="field"><label>优先级</label><select id="es_prio">'+["高","中","低"].map(x=>`<option value="${x}" ${x===(s.priority||"中")?"selected":""}>${x}</option>`).join("")+'</select></div>'+
+    '<div class="field"><label>状态</label><select id="es_status">'+stOpts+'</select></div>'+
+    '<div class="form-actions"><button class="btn btn-ghost" onclick="closeObjModal()">取消</button><button class="btn btn-blue" onclick="submitEditSched('+i+')">保存修改</button></div></div>');
+}
+async function submitEditSched(i){
+  var s=_dayScheds[i]; if(!s)return;
+  var title=document.getElementById("es_title").value.trim();
+  if(!title){toast("标题不能为空");return;}
+  var body={title:title,priority:document.getElementById("es_prio").value,status:document.getElementById("es_status").value};
+  var start=document.getElementById("es_start").value;
+  var end=document.getElementById("es_end").value;
+  if(start)body.start_time=start;
+  if(end)body.end_time=end;
+  try{
+    await apiFetch(API+"/schedules/"+s.id,{method:"PUT",body:JSON.stringify(body)});
+    closeObjModal(); toast("日程已更新 ✓"); loadSchedData();
+  }catch(e){toast("更新失败："+e.message);}
+}
+async function delSched(i){
+  var s=_dayScheds[i]; if(!s)return;
+  if(!confirm("确认删除该日程？"))return;
+  try{
+    await apiFetch(API+"/schedules/"+s.id,{method:"DELETE"});
+    toast("日程已删除 ✓"); loadSchedData();
+  }catch(e){toast("删除失败："+e.message);}
 }
 /* ===================== 通用 Modal ===================== */
 function openObjModal(title,html,size){
@@ -1196,6 +1292,211 @@ function openObjModal(title,html,size){
   mask.classList.add("open");
 }
 function closeObjModal(){document.getElementById("objModal").classList.remove("open");}
+
+/* ===================== 二期：资料库管理（V3.3） ===================== */
+const KB_TYPES=[
+  {key:"company",name:"集团概况",desc:"成立年限/规模/简介（销售总监审）"},
+  {key:"classes",name:"开班计划",desc:"学期/暑期班、课程（教务主管审）"},
+  {key:"awards",name:"荣誉资质",desc:"奖项/颁发机构/年份（市场主管审）"},
+  {key:"faqs",name:"常见 FAQ",desc:"价格/退费/试听政策（销售总监审）"},
+  {key:"sops",name:"跟进 SOP",desc:"销售流程模板"},
+  {key:"scripts",name:"销售话术",desc:"场景话术库"},
+  {key:"cases",name:"成功案例",desc:"转化案例"}
+];
+const KB_STATUS_LABEL={draft:"草稿",reviewing:"待审核",published:"已发布",archived:"已归档"};
+let _kbFilter="all";
+async function pageKb(){
+  const a=document.getElementById("acontent");
+  a.innerHTML=`<h2>📚 资料库管理</h2>
+    <div class="sub">二期第一层：集团官方资料库 · 运营上传/替换/审核/一键发布生效</div>
+    <div class="kpis">
+      <div class="kpi"><div class="l">📄 文档总数</div><div class="v" id="kbTotal">—</div><div class="d">托管文档</div></div>
+      <div class="kpi"><div class="l">✅ 已发布</div><div class="v" id="kbPub">—</div><div class="d">已进向量库</div></div>
+      <div class="kpi"><div class="l">⏳ 待审核</div><div class="v" id="kbReview">—</div><div class="d">草稿/待审核</div></div>
+    </div>
+    <div class="alias-row" style="margin-bottom:10px">
+      <select id="kbFilter" onchange="_kbFilter=this.value;renderKbDocs();" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px">
+        <option value="all">全部类型</option>
+        ${KB_TYPES.map(t=>`<option value="${t.key}">${t.name}</option>`).join("")}
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="openKbDocModal()">＋ 新增文档</button>
+      <button class="btn btn-ghost btn-sm" onclick="pageKb()">🔄 刷新</button>
+      <span class="hint" style="margin-left:auto">发布后自动重建向量索引，顾问侧秒级生效</span>
+    </div>
+    <div class="box"><h3>文档列表</h3><div id="kbDocList">加载中…</div></div>`;
+  await renderKbDocs();
+}
+async function renderKbDocs(){
+  const list=document.getElementById("kbDocList");
+  if(!list)return;
+  try{
+    const j=await apiFetch("/api/rag/admin/docs?page=1&page_size=200"+( _kbFilter!=="all"?"&kb_name="+encodeURIComponent(_kbFilter):""));
+    const items=j.items||[];
+    document.getElementById("kbTotal").textContent=items.length;
+    const pub=items.filter(d=>d.doc_status==="published").length;
+    const rev=items.filter(d=>d.doc_status!=="published").length;
+    document.getElementById("kbPub").textContent=pub;
+    document.getElementById("kbReview").textContent=rev;
+    if(!items.length){list.innerHTML='<div class="hint">暂无托管文档（knowledge_base/ 下的 .md 文件仍可被索引，后台托管文档用于运营自助维护）</div>';return;}
+    list.innerHTML=items.map(d=>{
+      const kb=KB_TYPES.find(t=>t.key===d.kb_name)||{name:d.kb_name};
+      const stCls=d.doc_status==="published"?"s-ok":(d.doc_status==="reviewing"?"s-wait":"s-off");
+      const srcCnt=d.content?Math.ceil(d.content.length/400):0;
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)">
+        <div style="min-width:0">
+          <div style="display:flex;align-items:center;gap:8px"><strong>${escapeHtml(d.title)}</strong><span class="status ${stCls}">${KB_STATUS_LABEL[d.doc_status]||d.doc_status}</span><span class="hint">v${d.version}</span></div>
+          <div class="hint" style="margin-top:3px">${escapeHtml(kb.name)} · ${escapeHtml(d.doc_key)} · 约 ${srcCnt} 段</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+          <button class="btn btn-ghost btn-sm" onclick="viewKbDoc(${d.id})">查看</button>
+          <button class="btn btn-ghost btn-sm" onclick="openKbDocModal(${d.id})">替换</button>
+          ${d.doc_status==="published"?'<button class="btn btn-ghost btn-sm" onclick="reindexKbDoc(\''+jsStr(d.kb_name)+'\')">重建索引</button>':'<button class="btn btn-blue btn-sm" onclick="publishKbDoc('+d.id+')">审核发布</button>'}
+          <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteKbDoc(${d.id})">删除</button>
+        </div>
+      </div>`;
+    }).join("");
+  }catch(e){list.innerHTML='<div class="hint">加载失败：'+escapeHtml(e.message)+'</div>';}
+}
+async function viewKbDoc(docId){
+  try{
+    const j=await apiFetch("/api/rag/admin/docs?page=1&page_size=200");
+    const d=(j.items||[]).find(x=>x.id===docId);
+    if(!d){toast("文档不存在");return;}
+    openObjModal(d.title,'<div class="hint">'+escapeHtml(d.doc_key)+' · v'+d.version+' · '+escapeHtml(KB_STATUS_LABEL[d.doc_status]||d.doc_status)+'</div><pre style="white-space:pre-wrap;background:var(--bg);padding:12px;border-radius:8px;font-size:12px;line-height:1.6;max-height:50vh;overflow:auto">'+escapeHtml(d.content)+'</pre>',"lg");
+  }catch(e){toast(e.message);}
+}
+function openKbDocModal(docId){
+  const editing=!!docId;
+  openObjModal(editing?"替换文档":"新增资料库文档",
+    `<div class="field"><label>知识库类型</label><select id="kbDocType">
+      ${KB_TYPES.filter(t=>["company","classes","awards","faqs"].includes(t.key)).map(t=>`<option value="${t.key}">${t.name}</option>`).join("")}
+    </select></div>
+    <div class="field"><label>标题</label><input id="kbDocTitle" placeholder="如：2026 秋季开班计划"></div>
+    <div class="field"><label>内容（Markdown）</label><textarea id="kbDocContent" rows="10" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12px;font-family:monospace"># 标题</textarea></div>
+    <div class="hint" style="margin-bottom:10px">保存后进入「草稿」，审核通过或一键发布后重建向量索引生效。</div>
+    <button class="btn btn-primary btn-block" onclick="saveKbDoc(${docId||0})">${editing?"保存（版本+1，回退草稿）":"保存为草稿"}</button>`,
+    "lg");
+}
+async function saveKbDoc(docId){
+  const kb_name=document.getElementById("kbDocType").value;
+  const title=document.getElementById("kbDocTitle").value.trim();
+  const content=document.getElementById("kbDocContent").value.trim();
+  if(!title||!content){toast("标题和内容不能为空");return;}
+  try{
+    if(docId){
+      await apiFetch("/api/rag/admin/docs/"+docId,{method:"PUT",body:JSON.stringify({kb_name,title,content,doc_status:"draft"})});
+      toast("已替换（版本+1），需重新审核发布");
+    }else{
+      await apiFetch("/api/rag/admin/docs",{method:"POST",body:JSON.stringify({kb_name,title,content,doc_status:"draft"})});
+      toast("已保存为草稿，请审核发布");
+    }
+    closeObjModal(); renderKbDocs();
+  }catch(e){toast(e.message);}
+}
+async function publishKbDoc(docId){
+  if(!confirm("确认审核通过并发布该文档？发布后立即重建索引生效。"))return;
+  try{
+    const j=await apiFetch("/api/rag/admin/docs/"+docId+"/publish",{method:"POST"});
+    toast("已发布并重建索引 ✓");
+    renderKbDocs();
+  }catch(e){toast(e.message);}
+}
+async function reindexKbDoc(kbName){
+  try{
+    await apiFetch("/api/rag/admin/reindex",{method:"POST",body:JSON.stringify({kb_name:kbName})});
+    toast("已重建 "+kbName+" 索引 ✓");
+  }catch(e){toast(e.message);}
+}
+async function deleteKbDoc(docId){
+  if(!confirm("确认删除该文档？删除后将重建索引移除向量。"))return;
+  try{
+    await apiFetch("/api/rag/admin/docs/"+docId,{method:"DELETE"});
+    toast("已删除 ✓");
+    renderKbDocs();
+  }catch(e){toast(e.message);}
+}
+
+/* ===================== 二期：AI 设置（V3.3：全局关停开关 + 指标 + 盲区/反馈） ===================== */
+async function pageAiSet(){
+  const a=document.getElementById("acontent");
+  a.innerHTML=`<h2>🧠 AI 设置</h2>
+    <div class="sub">二期安全护栏：全局关停开关（秒级生效）/ 验收指标 / 盲区数据 / 顾问反馈</div>
+    <div class="box"><h3>⚡ 全局关停开关 <i class="tip" data-tip="关闭综合推理后 AI 退回「知识库查询/单模块回复」简化模式，无需改代码/重启/发版，CTO 验收点">ⓘ</i></h3>
+      <div id="switchPanel">加载中…</div>
+    </div>
+    <div class="box"><h3>📈 二期验收指标（近30天）</h3><div id="aiStats">加载中…</div></div>
+    <div class="grid2">
+      <div class="box"><h3>🔍 盲区数据（兜底/未命中自动记录）</h3><div id="blindList">加载中…</div></div>
+      <div class="box"><h3>💬 顾问反馈汇总</h3><div id="fbList">加载中…</div></div>
+    </div>`;
+  try{
+    const cfg=await apiFetch(API+"/ai/config");
+    const on=cfg.reasoning_enabled!==false;
+    document.getElementById("switchPanel").innerHTML=`
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:600">
+          <input type="checkbox" id="reasoningSwitch" ${on?"checked":""} style="width:18px;height:18px"> 综合推理增强
+        </label>
+        <span class="status ${on?"s-ok":"s-off"}">${on?"已开启":"已关闭"}</span>
+        <div class="hint">关闭后：AI 仅做知识库查询 / 单模块回复（回退链路）</div>
+      </div>
+      <div class="alias-row" style="margin-top:10px">
+        <label class="hint">步数上限：<input type="number" id="maxSteps" value="${cfg.max_steps||3}" min="1" max="5" style="width:60px;padding:5px;border:1px solid var(--line);border-radius:6px"></label>
+        <label class="hint">匹配度门槛：<input type="number" id="minScore" value="${cfg.min_score||0.62}" step="0.01" min="0" max="1" style="width:70px;padding:5px;border:1px solid var(--line);border-radius:6px"></label>
+        <button class="btn btn-primary btn-sm" onclick="saveAiConfig()">保存配置</button>
+      </div>`;
+  }catch(e){document.getElementById("switchPanel").innerHTML='<div class="hint">'+escapeHtml(e.message)+'</div>';}
+  try{
+    const st=await apiFetch(API+"/ai/stats?days=30");
+    const t=st.totals||{};
+    document.getElementById("aiStats").innerHTML=`
+      <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+        <div class="kpi"><div class="l">🤖 兜底率</div><div class="v">${t.fallback_rate!=null?t.fallback_rate+"%":"—"}</div><div class="d">初期30-40%，连续一周>50%需补资料</div></div>
+        <div class="kpi"><div class="l">✏️ 修改率</div><div class="v">${t.modify_rate!=null?t.modify_rate+"%":"—"}</div><div class="d">AI 建议被顾问修改后发送</div></div>
+        <div class="kpi"><div class="l">⚠️ 推理失败率</div><div class="v">${t.reasoning_fail_rate!=null?t.reasoning_fail_rate+"%":"—"}</div><div class="d">初期≤25%，连续一周>40%需排查</div></div>
+        <div class="kpi"><div class="l">✅ 采纳率</div><div class="v">${t.adopt_rate!=null?t.adopt_rate+"%":"—"}</div><div class="d">采纳÷(采纳+丢弃)</div></div>
+      </div>
+      <div class="hint" style="margin-top:8px">盲区（近30天）：兜底 ${st.blind_spot?st.blind_spot.fallback||0:0} · 未命中 ${st.blind_spot?st.blind_spot.not_found||0:0} · 推理失败 ${st.blind_spot?st.blind_spot.reasoning_failed||0:0}</div>`;
+  }catch(e){document.getElementById("aiStats").innerHTML='<div class="hint">'+escapeHtml(e.message)+'</div>';}
+  renderBlindSpots(); renderFeedbackList();
+}
+async function saveAiConfig(){
+  const body={};
+  const sw=document.getElementById("reasoningSwitch").checked;
+  body.reasoning_enabled=sw;
+  const ms=parseInt(document.getElementById("maxSteps").value,10);
+  if(ms>=1&&ms<=5)body.max_steps=ms;
+  const sc=parseFloat(document.getElementById("minScore").value);
+  if(!isNaN(sc)&&sc>=0&&sc<=1)body.min_score=sc;
+  try{
+    await apiFetch(API+"/ai/config",{method:"PUT",body:JSON.stringify(body)});
+    toast("配置已保存，秒级生效 ✓"+(sw?"":"（综合推理已关闭，AI 退回简化模式）"));
+  }catch(e){toast(e.message);}
+}
+async function renderBlindSpots(){
+  const el=document.getElementById("blindList"); if(!el)return;
+  try{
+    const j=await apiFetch(API+"/ai/blind_spots?page=1&page_size=10");
+    const items=j.items||[];
+    if(!items.length){el.innerHTML='<div class="hint">暂无盲区数据（AI 兜底/未命中时会自动记录原始问题）</div>';return;}
+    el.innerHTML=items.map(b=>`<div style="padding:10px 0;border-bottom:1px solid var(--line)">
+      <div style="font-size:12px">${escapeHtml(b.original_question)}</div>
+      <div class="hint" style="margin-top:3px">${b.scene_type==="fallback"?"兜底":b.scene_type==="not_found"?"未命中":"推理失败"} · ${escapeHtml(b.advisor_name||"")} · ${escapeHtml(fmtDate(b.created_at))}</div>
+    </div>`).join("");
+  }catch(e){el.innerHTML='<div class="hint">加载失败：'+escapeHtml(e.message)+'</div>';}
+}
+async function renderFeedbackList(){
+  const el=document.getElementById("fbList"); if(!el)return;
+  try{
+    const j=await apiFetch(API+"/ai/feedback?page=1&page_size=10");
+    const items=j.items||[];
+    if(!items.length){el.innerHTML='<div class="hint">暂无顾问反馈（侧边栏反馈按钮采集）</div>';return;}
+    el.innerHTML=items.map(f=>`<div style="padding:10px 0;border-bottom:1px solid var(--line)">
+      <div style="font-size:12px">${f.signal_type==="positive"?"👍 有帮助":"👎 没帮助/方向不对"} <span class="hint">${escapeHtml(f.task_type||"")} · ${escapeHtml(f.external_id||"")}</span></div>
+      <div class="hint" style="margin-top:3px">${escapeHtml(fmtDate(f.created_at))}</div>
+    </div>`).join("");
+  }catch(e){el.innerHTML='<div class="hint">加载失败：'+escapeHtml(e.message)+'</div>';}
+}
 
 /* ===================== 启动 ===================== */
 document.getElementById("loginPass").addEventListener("keydown",e=>{if(e.key==="Enter")doLogin();});

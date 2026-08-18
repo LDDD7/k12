@@ -1,9 +1,12 @@
 # k12_app/routes/admin/orders.py
 """管理后台 — 订单管理"""
 
+import logging
 from typing import Optional
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 from k12_app.backend.services.order_service import OrderService
 
@@ -81,7 +84,8 @@ async def create_order(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"创建订单失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="创建订单失败，请稍后重试")
 
     return {"success": True, "message": "订单创建成功", "data": data}
 
@@ -93,8 +97,13 @@ async def update_order(
     current_admin: dict = Depends(get_admin_session),
 ):
     """更新订单（状态流转 / 产品 / 金额 / 日期）"""
-    if not OrderService.exists(order_id):
-        raise HTTPException(status_code=404, detail="订单不存在")
+    if not OrderService.get_by_order_id(
+        order_id=order_id,
+        user_id=current_admin["user_id"],
+        data_scope=current_admin.get("data_scope", "self"),
+        wework_account_id=current_admin.get("wework_account_id"),
+    ):
+        raise HTTPException(status_code=404, detail="订单不存在或无访问权限")
 
     if req.status is not None and req.status not in OrderService.VALID_ORDER_STATUSES:
         raise HTTPException(status_code=400, detail=f"无效的订单状态: {req.status}")

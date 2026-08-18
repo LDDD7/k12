@@ -13,6 +13,7 @@ from k12_app.backend.rag.retriever import (
     retrieve_similar_cases as _retrieve_similar_cases,
     retrieve_similar_customers as _retrieve_similar_customers,
     retrieve_chat_messages as _retrieve_chat_messages,
+    retrieve_kb as _retrieve_kb,
 )
 from k12_app.backend.dao.profile_dao import ProfileDAO
 
@@ -108,20 +109,84 @@ class RAGService:
         top_k: int = 10,
         external_id: Optional[str] = None,
         user_id: Optional[str] = None,
+        scope_user_id: Optional[str] = None,
+        data_scope: str = "self",
     ) -> List[Dict[str, Any]]:
         """
         语义检索聊天记录。
 
         从已向量化的企微聊天记录中搜索与查询最相关的历史消息，
         用于增强回复质量（找到类似场景下的成功对话）。
+        scope_user_id/data_scope 强制附加调用者数据范围，防止越权检索。
 
         Args:
             query: 搜索查询
             top_k: 返回数量
             external_id: 可选，按客户 ID 过滤
             user_id: 可选，按顾问 ID 过滤
+            scope_user_id: 调用者 user_id（self 范围强制过滤）
+            data_scope: 调用者数据权限范围
 
         Returns:
             [{id, text, metadata, score}, ...]
         """
-        return _retrieve_chat_messages(query, top_k, external_id, user_id)
+        return _retrieve_chat_messages(query, top_k, external_id, user_id, scope_user_id, data_scope)
+
+    # ==================== V3.3 二期：集团知识库（第一层） ====================
+
+    @staticmethod
+    def search_kb(
+        query: str,
+        kb_name: str = "all",
+        top_k: int = 3,
+        min_score: float = 0.0,
+    ) -> Dict[str, Any]:
+        """
+        集团知识库统一检索入口（供综合推理工具与搜索 API 调用）。
+
+        Args:
+            query: 用户问题
+            kb_name: company / classes / awards / faqs / all（全部集团库）
+            top_k: 每个库返回条数
+            min_score: 匹配度门槛（低于该值视为未命中，调用方据此走兜底）
+
+        Returns:
+            {
+                kb_name: 实际检索类型,
+                matched: bool,            # 是否有命中（score >= min_score）
+                top_score: float,         # 最高相似度
+                sources: [{id, text, metadata, score}, ...],
+            }
+        """
+        if kb_name == "all":
+            candidates = []
+            for kb in ("company", "classes", "awards", "faqs"):
+                candidates.extend(_retrieve_kb(kb, query, top_k))
+            # 按相似度降序，取全局 top_k
+            candidates.sort(key=lambda r: r.get("score", 0.0), reverse=True)
+            sources = candidates[:top_k]
+        else:
+            sources = _retrieve_kb(kb_name, query, top_k)
+
+        top_score = max((s.get("score", 0.0) for s in sources), default=0.0)
+        return {
+            "kb_name": kb_name,
+            "matched": top_score >= min_score and bool(sources),
+            "top_score": round(top_score, 4),
+            "sources": sources,
+        }
+
+    @staticmethod
+    def retrieve_company_info(question: str, top_k: int = 3) -> List[Dict[str, Any]]:
+        """检索集团概况"""
+        return _retrieve_kb("company", question, top_k)
+
+    @staticmethod
+    def retrieve_class_info(question: str, top_k: int = 3) -> List[Dict[str, Any]]:
+        """检索开班计划"""
+        return _retrieve_kb("classes", question, top_k)
+
+    @staticmethod
+    def retrieve_awards(question: str, top_k: int = 3) -> List[Dict[str, Any]]:
+        """检索荣誉资质"""
+        return _retrieve_kb("awards", question, top_k)

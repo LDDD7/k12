@@ -73,7 +73,7 @@ class ProfileService:
 
             logger.info(f"画像确认成功: external_id={external_id}, profile_id={profile_id}")
 
-            # 4. 实时推送画像变更通知（N2）：订阅该客户画像流的 SSE 客户端自动刷新
+            # 4. 实时推送画像变更通知：订阅该客户画像流的 SSE 客户端自动刷新
             try:
                 from k12_app.backend.services.event_bus import EventBus
                 EventBus.publish(f"profile_update:{external_id}", {
@@ -94,6 +94,53 @@ class ProfileService:
         except Exception as e:
             logger.error(f"确认画像异常: {e}", exc_info=True)
             return None
+
+    @staticmethod
+    def confirm_existing(
+        external_id: str,
+        confirmed_by: str,
+        user_id: str,
+        data_scope: str,
+        wework_account_id: str,
+    ) -> Optional[int]:
+        """直接确认某客户最新画像草稿（无需中断上下文）
+
+        Returns:
+            已确认/已存在的 profile_id，或 None
+        """
+        profile = ProfileService.get_profile(external_id, user_id, data_scope, wework_account_id)
+        if not profile:
+            return None
+        if profile["status"] == "已确认":
+            return profile["id"]
+
+        ok = ProfileDAO.confirm(profile["id"], confirmed_by, embedding_status="pending")
+        if not ok:
+            logger.error(f"直接确认画像失败: profile_id={profile['id']}")
+            return None
+
+        logger.info(f"画像直接确认成功: external_id={external_id}, profile_id={profile['id']}, confirmed_by={confirmed_by}")
+
+        try:
+            from k12_app.backend.services.event_bus import EventBus
+            EventBus.publish(f"profile_update:{external_id}", {
+                "external_id": external_id,
+                "event": "profile_confirmed",
+                "profile_id": profile["id"],
+                "confirmed_by": confirmed_by,
+            })
+        except Exception as e:
+            logger.warning(f"推送画像变更通知失败: {e}")
+
+        TaskLogDAO.log_task(
+            task_type="profile",
+            user_id=profile["follow_user_id"],
+            external_id=external_id,
+            wework_account_id=profile.get("wework_account_id", ""),
+            action="confirmed",
+            action_detail={"profile_id": profile["id"], "item_count": 0},
+        )
+        return profile["id"]
 
     @staticmethod
     def get_profile(external_id: str, user_id: str, data_scope: str, wework_account_id: str) -> Optional[Dict]:

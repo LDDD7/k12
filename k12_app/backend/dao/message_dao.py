@@ -111,13 +111,14 @@ class MessageDAO:
                 MsgWxqyChat.external_id == external_id,
                 MsgWxqyChat.msg_date.between(start_date, end_date),
             )
-            query = apply_scope_conditions(
+            # V3.3.2：聊天记录权限按"客户归属"过滤（external_id → biz_customer.follow_user_id），
+            # 而非消息自身的 user_id——否则模拟家长/代发消息按操作人分散后，客户顾问会漏看自己的会话
+            query = apply_kf_scope_conditions(
                 query=query,
                 model=MsgWxqyChat,
                 data_scope=data_scope,
                 user_id=user_id,
                 wework_account_id=wework_account_id,
-                owner_field="user_id",
             )
             rows = query.order_by(MsgWxqyChat.send_time.desc()).limit(limit).all()
             return [
@@ -378,6 +379,28 @@ class MessageDAO:
             )
 
     @staticmethod
+    def customer_message_exists_with_content(
+        user_id: str, external_id: str, content: str
+    ) -> bool:
+        """判断会话中是否已有客户（sender=external_id）发过完全相同的内容。
+
+        用于防止「复制客户原话再发一遍」被以顾问身份重复入库：
+        顾问发送内容若与会话内客户已有消息完全一致，视为复制重发，跳过写入。
+        """
+        sorted_key = MessageDAO.generate_sorted_key(user_id, external_id)
+        with session_scope() as session:
+            row = (
+                session.query(MsgWxqyChat.id)
+                .filter(
+                    MsgWxqyChat.sorted_key == sorted_key,
+                    MsgWxqyChat.sender == external_id,
+                    MsgWxqyChat.content == content,
+                )
+                .first()
+            )
+            return row is not None
+
+    @staticmethod
     def get_chat_messages_for_flush(
         user_id: str,
         external_id: str,
@@ -435,19 +458,22 @@ class MessageDAO:
         data_scope: str,
         wework_account_id: Optional[str],
     ) -> int:
-        """按客户删除聊天消息（与 get_chat_history_by_external_id 使用相同权限过滤）。"""
+        """按客户删除聊天消息（与 get_chat_history_by_external_id 使用相同权限过滤）。
+
+        V3.3.2：权限过滤与查询一致——按"客户归属"（external_id → biz_customer.follow_user_id）
+        而非消息自身 user_id，确保清空能删掉该客户全部消息（含其它操作人代发/模拟家长的消息）。
+        """
         if not wework_account_id:
             return 0
 
         with session_scope(commit=True) as session:
             query = delete(MsgWxqyChat).where(MsgWxqyChat.external_id == external_id)
-            query = apply_scope_conditions(
+            query = apply_kf_scope_conditions(
                 query=query,
                 model=MsgWxqyChat,
                 data_scope=data_scope,
                 user_id=user_id,
                 wework_account_id=wework_account_id,
-                owner_field="user_id",
             )
             result = session.execute(query)
             return result.rowcount
@@ -639,13 +665,14 @@ class MessageDAO:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
         limit: int = 1000,
+        offset: int = 0,
     ) -> List[Dict]:
         """按条件批量读取待索引的文本消息（RAG 索引器用）。
 
         支持两种模式：
         - external_ids 模式：按 external_id 列表（配合可选 after_time 增量过滤）
         - 日期范围模式：按 msg_date BETWEEN start_date AND end_date
-        统一过滤 msg_type='text' 且 content 非空，按 send_time 倒序，limit 截断。
+        统一过滤 msg_type='text' 且 content 非空，按 send_time 倒序，limit/offset 分页。
         """
         if not start_date and not end_date and not external_ids:
             return []
@@ -662,7 +689,7 @@ class MessageDAO:
             else:
                 query = query.filter(MsgWxqyChat.msg_date.between(start_date, end_date))
 
-            rows = query.order_by(MsgWxqyChat.send_time.desc()).limit(limit).all()
+            rows = query.order_by(MsgWxqyChat.send_time.desc()).limit(limit).offset(offset).all()
             return [
                 {
                     "msg_id": r.msg_id,

@@ -30,6 +30,7 @@ CHROMA_PATH = Path(__file__).parent.parent.parent / "chroma_data"
 KB_DIR = Path(__file__).parent.parent.parent / "knowledge_base"
 
 # Collection 映射
+# V3.3 二期新增：company（集团概况）/ classes（开班计划）/ awards（荣誉资质）
 KB_COLLECTION_MAP = {
     "scripts": "k12_scripts",
     "sops": "k12_sops",
@@ -37,6 +38,9 @@ KB_COLLECTION_MAP = {
     "cases": "k12_cases",
     "customer_profiles": "k12_customer_profiles",
     "chat_messages": "k12_chat_messages",
+    "company": "k12_company",
+    "classes": "k12_classes",
+    "awards": "k12_awards",
 }
 
 # 切片参数
@@ -51,39 +55,62 @@ def _get_chroma_client() -> chromadb.PersistentClient:
 
 def _load_markdown_files(kb_name: str) -> List[Dict[str, Any]]:
     """
-    加载知识库目录下的所有 .md 文件。
+    加载知识库目录下的所有 .md 文件，并与已发布的托管文档（rag_kb_managed_doc）合并。
+
+    托管文档优先级更高：同一 doc_key 时以托管文档内容为准（运营后台替换后版本递增）。
 
     Returns:
         [{doc_id, kb_name, file_path, title, content}, ...]
     """
     kb_path = KB_DIR / kb_name
-    if not kb_path.exists():
-        logger.warning(f"知识库目录不存在: {kb_path}")
-        return []
-
     docs = []
-    for md_file in sorted(kb_path.glob("*.md")):
-        try:
-            content = md_file.read_text(encoding="utf-8")
-            # 提取标题（第一个 # 行）
-            title = md_file.stem
-            for line in content.split("\n"):
-                line = line.strip()
-                if line.startswith("# "):
-                    title = line[2:].strip()
-                    break
+    seen_keys = set()
 
-            doc_id = f"{kb_name}/{md_file.stem}"
+    if kb_path.exists():
+        for md_file in sorted(kb_path.glob("*.md")):
+            try:
+                content = md_file.read_text(encoding="utf-8")
+                # 提取标题（第一个 # 行）
+                title = md_file.stem
+                for line in content.split("\n"):
+                    line = line.strip()
+                    if line.startswith("# "):
+                        title = line[2:].strip()
+                        break
+
+                doc_id = f"{kb_name}/{md_file.stem}"
+                seen_keys.add(doc_id)
+                docs.append({
+                    "doc_id": doc_id,
+                    "kb_name": kb_name,
+                    "file_path": str(md_file.relative_to(KB_DIR.parent)),
+                    "title": title,
+                    "content": content,
+                })
+            except Exception as e:
+                logger.error(f"读取文件失败: {md_file} — {e}")
+
+    # V3.3：合并已发布的托管文档（运营后台维护，优先于文件版本）
+    try:
+        from k12_app.backend.dao.rag_dao import RAGDAO
+        managed = RAGDAO.get_published_managed_docs(kb_name)
+        for m in managed:
+            doc_key = m["doc_key"]
+            # 替换同名文件版本
+            docs = [d for d in docs if d["doc_id"] != doc_key]
             docs.append({
-                "doc_id": doc_id,
+                "doc_id": doc_key,
                 "kb_name": kb_name,
-                "file_path": str(md_file.relative_to(KB_DIR.parent)),
-                "title": title,
-                "content": content,
+                "file_path": f"managed/{doc_key}",
+                "title": m["title"],
+                "content": m["content"],
             })
-        except Exception as e:
-            logger.error(f"读取文件失败: {md_file} — {e}")
+            seen_keys.add(doc_key)
+    except Exception as e:
+        logger.warning(f"加载托管文档失败 kb_name={kb_name}: {e}")
 
+    # 保证顺序稳定（先文件后托管，按 doc_id 排序）
+    docs.sort(key=lambda d: d["doc_id"])
     return docs
 
 
@@ -218,6 +245,30 @@ def reindex_kb(
             )
             logger.info(f"ChromaDB 写入完成: {collection_name} ({len(all_ids)} vectors)")
 
+        # 5.4 清理失效向量：删除不再存在于源文档中的旧 chunk（撤稿/删除文档后不残留旧内容）
+        try:
+            if collection and all_ids:
+                current_doc_ids = {d["doc_id"] for d in docs}
+                existing = collection.get(where={"kb_name": kb_name}, include=[])
+                stale_ids = [
+                    cid for cid in (existing.get("ids") or [])
+                    if cid.rsplit("_chunk_", 1)[0] not in current_doc_ids
+                ]
+                if stale_ids:
+                    # 分批删除，避免一次删除过多
+                    for i in range(0, len(stale_ids), 500):
+                        collection.delete(ids=stale_ids[i:i + 500])
+                    logger.info(f"已清理 {len(stale_ids)} 条失效向量: {collection_name}")
+        except Exception as e:
+            logger.warning(f"清理失效向量失败: {e}")
+
+        # 5.5 V3.3：失效检索缓存，保证"一键发布"立即生效（无需重启）
+        try:
+            from k12_app.backend.rag.retriever import invalidate_collection_cache
+            invalidate_collection_cache(kb_name)
+        except Exception as e:
+            logger.warning(f"失效检索缓存失败: {e}")
+
         elapsed_ms = int((time.time() - start_time) * 1000)
 
         # 6. 记录索引日志
@@ -265,10 +316,52 @@ def reindex_kb(
 
 
 def reindex_all(triggered_by: str = "manual", force: bool = False) -> Dict[str, Any]:
-    """重建全部 4 个知识库的索引"""
+    """重建全部 7 个知识库的索引（V3.3：含 company/classes/awards）"""
     results = {}
-    for kb_name in ["scripts", "sops", "faqs", "cases"]:
+    for kb_name in ["scripts", "sops", "faqs", "cases", "company", "classes", "awards"]:
         results[kb_name] = reindex_kb(kb_name, triggered_by=triggered_by, force=force)
+    return results
+
+
+def ensure_indexes_initialized() -> Dict[str, Any]:
+    """
+    启动时自动补建缺失的向量索引（问题 3 修复）。
+
+    遍历所有 Collection，仅当集合不存在或为空 且 存在可索引的源数据时补建：
+    - chat_messages：全量窗口 days=90（覆盖种子数据所在时间窗），不删旧集合
+    - customer_profiles：由已确认画像构建
+    - 其余知识库：从 markdown 文件 / 已发布托管文档构建
+
+    全程 best-effort：任一集合失败仅告警，绝不影响服务启动。
+    已非空的集合跳过（后续增量由 flush_chat_conversation / 手动 reindex 维护）。
+
+    Returns:
+        {kb_name: reindex 结果}，被跳过的集合不在结果中
+    """
+    results: Dict[str, Any] = {}
+    client = _get_chroma_client()
+    for kb_name, collection_name in KB_COLLECTION_MAP.items():
+        try:
+            collection = client.get_collection(name=collection_name)
+            if collection.count() > 0:
+                continue  # 已有索引，交给增量同步
+        except Exception:
+            pass  # 集合不存在 → 需要补建
+
+        try:
+            if kb_name == "chat_messages":
+                results[kb_name] = reindex_chat_messages(
+                    days=90, limit=5000, triggered_by="startup", incremental=False,
+                )
+            elif kb_name == "customer_profiles":
+                results[kb_name] = reindex_profiles(triggered_by="startup")
+            else:
+                results[kb_name] = reindex_kb(kb_name, triggered_by="startup")
+            logger.info(f"启动自动补建索引 {kb_name}: {results[kb_name].get('status')}, "
+                        f"doc_count={results[kb_name].get('doc_count')}")
+        except Exception as e:
+            logger.warning(f"启动自动补建索引 {kb_name} 失败（不影响服务）: {e}")
+            results[kb_name] = {"kb_name": kb_name, "status": "error", "error_message": str(e)}
     return results
 
 
@@ -379,6 +472,13 @@ def reindex_profiles(triggered_by: str = "manual", force: bool = False) -> Dict[
                 documents=all_documents,
             )
             logger.info(f"ChromaDB 写入完成: {collection_name} ({total_chunks} vectors)")
+
+        # 4.5 V3.3：失效检索缓存（画像重建后立即生效）
+        try:
+            from k12_app.backend.rag.retriever import invalidate_collection_cache
+            invalidate_collection_cache(kb_name)
+        except Exception as e:
+            logger.warning(f"失效检索缓存失败: {e}")
 
         # 5. 更新 embedding_status 为 indexed
         if indexed_ids:
@@ -501,6 +601,7 @@ def reindex_chat_messages(
             logger.info(f"采纳模式: {len(adopted_external_ids)} 个被采纳客户")
 
         # === 1. 查询待索引的文本消息（ORM：MessageDAO） ===
+        messages = []
         if adopted_only and adopted_external_ids:
             # 采纳模式：只查被采纳客户的聊天记录
             messages = MessageDAO.get_messages_for_reindex(
@@ -516,11 +617,23 @@ def reindex_chat_messages(
             else:
                 start_date = end_date - timedelta(days=days)
 
-            messages = MessageDAO.get_messages_for_reindex(
-                start_date=start_date,
-                end_date=end_date,
-                limit=limit,
-            )
+            # 单窗口消息可能超过单次 limit（如单日 >1000 条），分页取全，
+            # 避免更早消息被挤出且游标仍前进导致永不被索引
+            page_size = limit or 1000
+            offset = 0
+            while True:
+                page = MessageDAO.get_messages_for_reindex(
+                    start_date=start_date,
+                    end_date=end_date,
+                    limit=page_size,
+                    offset=offset,
+                )
+                if not page:
+                    break
+                messages.extend(page)
+                if len(page) < page_size:
+                    break
+                offset += page_size
 
         if not messages:
             return {
@@ -611,6 +724,13 @@ def reindex_chat_messages(
                 documents=all_documents,
             )
             logger.info(f"ChromaDB 写入完成: {collection_name} ({total_chunks} vectors)")
+
+        # 4.5 V3.3：失效检索缓存（聊天记录重建后立即生效）
+        try:
+            from k12_app.backend.rag.retriever import invalidate_collection_cache
+            invalidate_collection_cache(kb_name)
+        except Exception as e:
+            logger.warning(f"失效检索缓存失败: {e}")
 
         elapsed_ms = int((time.time() - start_time) * 1000)
 
@@ -790,6 +910,13 @@ def flush_chat_conversation(
             documents=all_documents,
         )
 
+    # V3.3：失效检索缓存（会话归档后立即生效）
+    try:
+        from k12_app.backend.rag.retriever import invalidate_collection_cache
+        invalidate_collection_cache("chat_messages")
+    except Exception as e:
+        logger.warning(f"失效检索缓存失败: {e}")
+
     deleted = MessageDAO.delete_chat_messages_by_msg_ids(archive_ids)
 
     logger.info(
@@ -837,12 +964,13 @@ def delete_chat_vectors(
 
     where: Dict[str, Any] = {"external_id": external_id}
     if data_scope == "self":
-        if not user_id or not wework_account_id:
+        # V3.3.2：与 MySQL 删除一致——按客户归属删除，不再限定消息的 user_id，
+        # 否则其它操作人（如超管）代发/模拟家长的消息向量删不掉，清空后 AI 仍"记得"
+        if not wework_account_id:
             return 0
         where = {
             "$and": [
                 {"external_id": external_id},
-                {"user_id": user_id},
                 {"wework_account_id": wework_account_id},
             ]
         }
@@ -864,6 +992,32 @@ def delete_chat_vectors(
         return 1
     except Exception as e:
         logger.warning(f"删除向量库聊天记录失败: external_id={external_id}, err={e}")
+        return 0
+
+
+def delete_profile_vectors(external_id: str) -> int:
+    """删除向量库中该客户的画像向量（V3.3.2：「清空重置」彻底清除 AI 记忆用）。
+
+    k12_customer_profiles 集合按 external_id 过滤删除，
+    否则相似客户检索仍能命中已删除画像的客户。
+    """
+    collection_name = KB_COLLECTION_MAP["customer_profiles"]
+    client = _get_chroma_client()
+    try:
+        collection = client.get_collection(name=collection_name)
+    except Exception:
+        return 0
+    try:
+        collection.delete(where={"external_id": external_id})
+        logger.info(f"向量库画像已删除: external_id={external_id}")
+        try:
+            from k12_app.backend.rag.retriever import invalidate_collection_cache
+            invalidate_collection_cache("customer_profiles")
+        except Exception as e:
+            logger.warning(f"失效检索缓存失败: {e}")
+        return 1
+    except Exception as e:
+        logger.warning(f"删除向量库画像失败: external_id={external_id}, err={e}")
         return 0
 
 
@@ -916,5 +1070,10 @@ def get_reindex_status() -> Dict[str, Any]:
             "total_chars": total_chars,
             "last_indexed_at": last_indexed_at,
         }
+        # 问题 3 修复：空集合给出明确提示（前端可展示，字段新增不破坏既有响应）
+        if doc_count == 0:
+            result[kb_name]["hint"] = (
+                "集合为空，未构建索引；可手动触发重建，或重启服务自动补建"
+            )
 
     return result

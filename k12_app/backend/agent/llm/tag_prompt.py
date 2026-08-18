@@ -8,7 +8,7 @@ import logging
 from typing import List, Dict
 
 from k12_app.backend.agent.llm.client import call_llm
-from k12_app.backend.agent.llm.utils import extract_json_list, clean_data_for_json
+from k12_app.backend.agent.llm.utils import extract_json_list, clean_data_for_json, repair_json_with_llm
 
 logger = logging.getLogger(__name__)
 
@@ -83,8 +83,12 @@ def recommend_tags(
 """
 
     try:
-        raw_response = call_llm(system_prompt, user_content, temperature=0.3)
+        raw_response = call_llm(system_prompt, user_content, temperature=0.3, max_tokens=1200)
         data = extract_json_list(raw_response)
+
+        if not data:
+            logger.warning(f"标签推荐返回无效 JSON，尝试 LLM 修复: {raw_response[:120]}")
+            data = repair_json_with_llm(raw_response, expect_list=True, max_tokens=1200)
 
         if data and isinstance(data, list):
             # 过滤无效推荐

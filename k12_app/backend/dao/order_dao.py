@@ -63,6 +63,59 @@ class OrderDAO:
         return query
 
     @staticmethod
+    def get_by_order_id(
+        order_id: str,
+        user_id: str,
+        data_scope: str,
+        wework_account_id: Optional[str],
+    ) -> Optional[Dict]:
+        """按订单号查询订单（带权限过滤）"""
+        if not wework_account_id and data_scope != "all":
+            return None
+
+        with session_scope() as session:
+            query = (
+                session.query(
+                    BizOrder.order_id,
+                    BizOrder.union_id,
+                    BizOrder.wework_account_id,
+                    BizOrder.product_names,
+                    BizOrder.amount,
+                    BizOrder.status,
+                    BizOrder.order_time,
+                    BizOrder.order_date,
+                    BizOrder.created_at,
+                    BizOrder.updated_at,
+                    BizCustomer.external_id,
+                    BizCustomer.name.label("customer_name"),
+                    BizCustomer.follow_user_id,
+                )
+                .join(BizCustomer, BizOrder.union_id == BizCustomer.union_id)
+                .filter(BizOrder.order_id == order_id)
+            )
+            query = OrderDAO._apply_order_scope(query, data_scope, user_id, wework_account_id)
+            if query is None:
+                return None
+            r = query.first()
+            if not r:
+                return None
+            return {
+                "order_id": r.order_id,
+                "union_id": r.union_id,
+                "wework_account_id": r.wework_account_id,
+                "product_names": r.product_names,
+                "amount": r.amount,
+                "status": r.status,
+                "order_time": r.order_time,
+                "order_date": r.order_date,
+                "created_at": r.created_at,
+                "updated_at": r.updated_at,
+                "external_id": r.external_id,
+                "customer_name": r.customer_name,
+                "follow_user_id": r.follow_user_id,
+            }
+
+    @staticmethod
     def get_by_union_id(
         union_id: str,
         user_id: str,

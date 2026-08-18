@@ -200,6 +200,9 @@ CREATE TABLE biz_schedule (
     source               VARCHAR(16) NOT NULL,
     status               VARCHAR(16) NOT NULL DEFAULT '待确认',
     wx_calendar_event_id VARCHAR(64),
+    confirmed_by         VARCHAR(64),
+    confirmed_at         DATETIME(3),
+    confirm_source       VARCHAR(16),
     created_at           DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
     updated_at           DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     CONSTRAINT fk_schedule_account FOREIGN KEY (wework_account_id)
@@ -462,6 +465,60 @@ CREATE TABLE rag_kb_index_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE INDEX idx_rag_log_kb ON rag_kb_index_log (kb_name, created_at);
+
+-- ============================================================
+-- 七、二期「RAG 知识库 + 综合推理」新增表 (V3.3, 2026-08)
+-- ============================================================
+
+-- 3.22 全局 AI 配置表（关停开关等 key-value 配置，秒级生效）
+CREATE TABLE sys_ai_config (
+    id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+    cfg_key     VARCHAR(64) NOT NULL,
+    cfg_value   VARCHAR(512) NOT NULL,
+    cfg_desc    VARCHAR(256),
+    updated_by  VARCHAR(64),
+    updated_at  DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    CONSTRAINT uk_ai_config_key UNIQUE (cfg_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 3.23 AI 盲区数据记录表（走兜底/推理失败时自动记录原始问题，反哺资料库）
+CREATE TABLE ai_blind_spot_log (
+    id                 BIGINT AUTO_INCREMENT PRIMARY KEY,
+    original_question  TEXT NOT NULL,
+    scene_type         VARCHAR(16) NOT NULL,          -- fallback=兜底 / reasoning_failed=推理失败 / not_found=未命中
+    kb_types           VARCHAR(64),                   -- 尝试检索的知识库类型
+    matched_text       TEXT,                          -- 命中的参考片段（可为空）
+    advisor_name       VARCHAR(64),
+    user_id            VARCHAR(64),
+    external_id        VARCHAR(64),
+    wework_account_id  VARCHAR(32),
+    task_log_id        BIGINT,
+    created_at         DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX idx_blind_spot_created ON ai_blind_spot_log (created_at);
+CREATE INDEX idx_blind_spot_type ON ai_blind_spot_log (scene_type, created_at);
+
+-- 3.24 资料库托管文档表（运营上传/替换/审核/发布，发布后重建向量索引）
+CREATE TABLE rag_kb_managed_doc (
+    id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+    doc_key       VARCHAR(64) NOT NULL,               -- 如 company/01_集团概况（唯一键）
+    kb_name       VARCHAR(32) NOT NULL,               -- company / classes / awards / faqs ...
+    title         VARCHAR(128) NOT NULL,
+    content       TEXT NOT NULL,
+    doc_status    VARCHAR(16) NOT NULL DEFAULT 'draft',  -- draft=草稿 / reviewing=待审核 / published=已发布 / archived=已归档
+    version       INT NOT NULL DEFAULT 1,
+    created_by    VARCHAR(64),
+    reviewed_by   VARCHAR(64),
+    review_comment VARCHAR(256),
+    reviewed_at   DATETIME(3),
+    published_at  DATETIME(3),
+    created_at    DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at    DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    CONSTRAINT uk_managed_doc_key UNIQUE (doc_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX idx_managed_doc_kb ON rag_kb_managed_doc (kb_name, doc_status);
 
 -- ============================================================
 -- 初始化数据
@@ -764,6 +821,22 @@ INSERT INTO ai_profile_item (profile_id, item_name, item_value, confidence, conf
 (7,'学习目标','计算基础巩固',0.74,'中','llm','AI 语义分析'),
 (7,'价格敏感度','中',0.60,'中','llm','AI 行为分析'),
 (7,'决策风格','信任关系型',0.68,'中','llm','AI 行为分析');
+
+-- ============================================================
+-- 10. 二期「RAG 知识库 + 综合推理」种子数据 (V3.3)
+-- ============================================================
+
+-- 10.1 全局 AI 配置（默认开启综合推理；开关在管理后台可一键关闭，秒级生效）
+INSERT INTO sys_ai_config (cfg_key, cfg_value, cfg_desc, updated_by) VALUES
+('ai_reasoning_enabled', 'true', '综合推理开关：true=开启 / false=关闭（关闭后 AI 退回知识库查询/单模块回复）', 'admin'),
+('ai_reasoning_max_steps', '3', '综合推理最大步数上限（防跑偏）', 'admin'),
+('ai_reasoning_min_score', '0.62', '知识库检索匹配度门槛（低于该值视为未命中，走兜底话术）', 'admin');
+
+-- 10.2 资料库托管文档（与 knowledge_base/company|classes|awards/*.md 对应，运营可在后台替换）
+INSERT INTO rag_kb_managed_doc (doc_key, kb_name, title, content, doc_status, version, created_by, reviewed_by, published_at) VALUES
+('company/01_集团概况','company','集团概况','# 集团概况\n\n擎天学智教育集团成立于 2015 年，深耕 K12 课外辅导 10 年，覆盖语数英物化生全学科。集团现有直营校区 40 余家，遍布深圳、上海、北京、广州、杭州等一二线城市，全职教师 1200 余人，累计服务学员超过 30 万人次。\n\n我们坚持"小班制 + 因材施教"的教学理念，6-8 人小班授课，每年投入营收的 15% 用于教研，拥有自研教材体系。','published',1,'admin','admin','2026-08-05 10:00:00'),
+('classes/01_2026暑期开班计划','classes','2026 暑期开班计划','# 2026 暑期开班计划\n\n## 初中\n- 初一数学暑期同步班：每周一/三/五 09:00-11:00，6-8 人小班，4280 元/期（16 课时）\n- 初二数学暑期提高班：每周二/四/六 09:00-11:00，针对基础较好学生，4880 元/期（16 课时）\n- 初二物理衔接班：每周二/四/六 14:00-16:00，零基础可报，4280 元/期（16 课时）\n\n## 高中\n- 高一物理力学衔接班：每周一/三/五 14:00-16:00，4880 元/期（16 课时）\n\n## 小学\n- 四年级数学应用题专题班：每周三/五 19:00-21:00，3680 元/期（16 课时）\n\n暑期报名早鸟 9 折（7 月 31 日前），老学员续报再享 95 折。','published',1,'admin','admin','2026-08-05 10:00:00'),
+('awards/01_荣誉资质','awards','荣誉资质','# 荣誉资质\n\n- 2019 年：获得"深圳市教育行业诚信单位"（深圳市教育局颁发）\n- 2021 年：获评"中国教育培训行业品牌影响力 50 强"（中国教育学会颁发）\n- 2023 年：荣获"全国 K12 辅导机构教学质量标杆奖"（中国民办教育协会颁发）\n- 2025 年：入选"广东省重点培育教育品牌"（广东省教育厅指导评选）','published',1,'admin','admin','2026-08-05 10:00:00');
 
 -- ============================================================
 -- 验证查询（更新计数）

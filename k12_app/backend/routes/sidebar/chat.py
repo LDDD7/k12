@@ -31,8 +31,8 @@ class SendMessageRequest(BaseModel):
     def check_message_or_menu(self):
         if not self.message and not self.menu_id:
             raise ValueError("message 和 menu_id 必须至少提供一个")
-        if self.message and self.menu_id:
-            raise ValueError("message 和 menu_id 不能同时提供")
+        # V3.3.1：允许 message 与 menu_id 同时提供——
+        # 侧边栏「手动综合推理」按钮场景：menu_id 强制意图（reasoning_suggestion），message 作为推理内容
         return self
 
     @field_validator("wework_account_id")
@@ -52,6 +52,8 @@ class SendMessageRequest(BaseModel):
 
 class ClearChatRequest(BaseModel):
     external_id: str
+    # V3.3.2：reset_memory=true 时除聊天记录外，一并清除 AI 画像/标签/相关向量（彻底重置 AI 记忆）
+    reset_memory: bool = False
 
     @field_validator("external_id")
     @classmethod
@@ -98,8 +100,21 @@ async def send_message(
             detail="员工未绑定企微账户，请先绑定",
         )
 
-    # 持久化顾问发送的消息，保证聊天记录在刷新后不丢失
-    if req.message:
+    # 校验客户归属，防止向他人客户会话注入消息（IDOR）
+    from k12_app.backend.services.customer_service import CustomerService
+    cust = CustomerService.get_by_external_id(
+        external_id=req.external_id,
+        user_id=current_user["user_id"],
+        data_scope=current_user.get("data_scope", "self"),
+        wework_account_id=current_user.get("wework_account_id"),
+    )
+    if not cust:
+        raise HTTPException(status_code=404, detail="客户不存在或无访问权限")
+
+    # 持久化「真实发送」的顾问消息，保证聊天记录在刷新后不丢失。
+    # menu 驱动的分析（如「手动综合推理」自动复用的最近一条家长消息）只是 AI 推理输入，
+    # 并非顾问真正发送，不写入聊天记录——否则客户原话会被以顾问身份重复入库。
+    if req.message and not req.menu_id:
         try:
             MessageService.insert_chat_message(
                 user_id=current_user["user_id"],
@@ -148,12 +163,52 @@ async def clear_chat(
     req: ClearChatRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """清空当前顾问与某客户的聊天记录（MySQL 表 + 向量库历史一并清除）"""
+    """
+    清空当前顾问与某客户的聊天记录（MySQL 表 + 向量库历史一并清除）。
+
+    reset_memory=true（V3.3.2「彻底重置」）：额外清除该客户的 AI 画像（含画像向量）、
+    客户标签——AI 将不再记得该客户（订单为业务财务数据，保留）。
+    """
     if current_user.get("binding_status") == "unbound":
         raise HTTPException(status_code=403, detail="员工未绑定企微账户，请先绑定")
 
     data_scope = current_user.get("data_scope", "self")
     wework_account_id = current_user.get("wework_account_id")
+
+    # 校验客户可访问（reset_memory 会删除画像/标签，必须先确认归属）
+    if req.reset_memory:
+        from k12_app.backend.services.customer_service import CustomerService
+        cust = CustomerService.get_by_external_id(
+            external_id=req.external_id,
+            user_id=current_user["user_id"],
+            data_scope=data_scope,
+            wework_account_id=wework_account_id,
+        )
+        if not cust:
+            raise HTTPException(status_code=404, detail="客户不存在或无访问权限")
+
+    cleared = {"reset_memory": req.reset_memory}
+
+    # V3.3.2：彻底重置 —— 先删 MySQL 画像/标签（失败则中止，此时聊天记录未受影响，可安全重试）
+    if req.reset_memory:
+        try:
+            from k12_app.backend.dao.profile_dao import ProfileDAO
+            from k12_app.backend.dao.tag_dao import TagDAO
+
+            cleared["profile_deleted"] = ProfileDAO.delete_all_by_external_id(req.external_id)
+            cleared["tags_deleted"] = TagDAO.delete_customer_tags_by_external_id(
+                external_id=req.external_id,
+                user_id=current_user["user_id"],
+                data_scope=data_scope,
+                wework_account_id=wework_account_id,
+            )
+            logger.info(
+                f"已清除客户画像/标签: external_id={req.external_id}, "
+                f"by user={current_user['user_id']}, scope={data_scope}"
+            )
+        except Exception as e:
+            logger.error(f"重置客户 AI 记忆失败（聊天记录未受影响）: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="重置失败，聊天记录未受影响，请重试")
 
     deleted = MessageService.delete_chat_messages_by_external_id(
         external_id=req.external_id,
@@ -161,10 +216,11 @@ async def clear_chat(
         data_scope=data_scope,
         wework_account_id=wework_account_id,
     )
+    cleared["chat_deleted"] = deleted
 
-    # 同步清除向量库中已归档的历史向量，避免 AI 仍保留旧记忆
+    # 向量库删除均为尽力而为，失败不阻断主流程
     try:
-        from k12_app.backend.rag.index_builder import delete_chat_vectors
+        from k12_app.backend.rag.index_builder import delete_chat_vectors, delete_profile_vectors
         await asyncio.to_thread(
             delete_chat_vectors,
             external_id=req.external_id,
@@ -172,7 +228,9 @@ async def clear_chat(
             wework_account_id=wework_account_id,
             data_scope=data_scope,
         )
+        if req.reset_memory:
+            await asyncio.to_thread(delete_profile_vectors, req.external_id)
     except Exception as e:
-        logger.warning(f"清空向量库聊天记录失败: {e}")
+        logger.warning(f"清空向量库记录失败: {e}")
 
-    return {"success": True, "deleted": deleted}
+    return {"success": True, "deleted": deleted, "cleared": cleared}

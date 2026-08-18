@@ -15,6 +15,8 @@ from typing import Optional, List
 
 from k12_app.backend.services.employee_service import EmployeeService
 
+from k12_app.backend.dao.role_dao import RoleDAO
+
 from k12_app.backend.services.auth_service import get_admin_session
 
 router = APIRouter()
@@ -77,7 +79,10 @@ async def create_employee(
     req: EmployeeCreateRequest,
     current_admin: dict = Depends(get_admin_session),
 ):
-    """添加员工（含密码和角色）"""
+    """添加员工（含密码和角色），仅超管可操作"""
+    if not RoleDAO.is_super_admin(current_admin["user_id"]):
+        raise HTTPException(status_code=403, detail="仅超级管理员可添加员工")
+
     if EmployeeService.exists(req.user_id):
         raise HTTPException(status_code=400, detail="员工 ID 已存在")
 
@@ -135,7 +140,12 @@ async def delete_employee(
     user_id: str,
     current_admin: dict = Depends(get_admin_session),
 ):
-    """删除员工"""
+    """删除员工，仅超管可操作，且不能删除自己"""
+    if not RoleDAO.is_super_admin(current_admin["user_id"]):
+        raise HTTPException(status_code=403, detail="仅超级管理员可删除员工")
+    if user_id == current_admin["user_id"]:
+        raise HTTPException(status_code=403, detail="不能删除自己")
+
     if not EmployeeService.exists(user_id):
         raise HTTPException(status_code=404, detail="员工不存在")
 

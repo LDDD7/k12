@@ -247,6 +247,75 @@ async def get_customer_tags(
     }
 
 
+@router.post("/customer_tags/{external_id}/suggest")
+async def suggest_customer_tags(
+    external_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """真实 LLM 标签推荐：候选池与后台标签管理同源（cfg_tag_definition 全量），保证侧边栏可生成的标签=后台列出的标签"""
+    if current_user.get("binding_status") == "unbound":
+        raise HTTPException(status_code=403, detail="员工未绑定企微账户，请先绑定")
+
+    cust = CustomerService.get_by_external_id(
+        external_id=external_id,
+        user_id=current_user["user_id"],
+        data_scope=current_user.get("data_scope", "self"),
+        wework_account_id=current_user.get("wework_account_id"),
+    )
+    if not cust:
+        raise HTTPException(status_code=404, detail="客户不存在或无访问权限")
+
+    # 与 k12_graph.recommend_tag_node 同源构建 profile
+    profile = {
+        k: cust.get(k)
+        for k in ("child_name", "grade", "focus_subject", "school", "stage", "remark")
+        if cust.get(k)
+    }
+    if cust.get("name"):
+        profile["parent_name"] = cust["name"]
+
+    # 最近聊天记录
+    recent_chat = []
+    try:
+        chats = MessageService.get_chat_history_by_external_id(
+            external_id=external_id,
+            user_id=current_user["user_id"],
+            data_scope=current_user.get("data_scope", "self"),
+            wework_account_id=current_user.get("wework_account_id"),
+            days=30,
+            limit=20,
+        )
+        customer_name = cust.get("name") or ""
+        recent_chat = [
+            {"role": "parent" if c.get("sender_name") == customer_name else "advisor",
+             "content": c.get("content", "")}
+            for c in chats
+        ]
+    except Exception:
+        pass
+
+    # 候选池 = 后台标签管理同源（load_tags 同款展平）
+    from k12_app.backend.dao.tag_dao import TagDAO
+    pool = []
+    for strategy in TagDAO.get_all_tags():
+        for group in strategy.get("groups", []):
+            pool.extend(group.get("tags", []))
+
+    from k12_app.backend.agent.llm.tag_prompt import recommend_tags
+    results = await asyncio.to_thread(recommend_tags, profile, recent_chat, pool)
+    pool_by_id = {t["tag_id"]: t for t in pool}
+    data = [
+        {
+            "tag_id": r["tag_id"],
+            "tag_name": pool_by_id[r["tag_id"]].get("tag_name", ""),
+            "reason": r.get("reason", ""),
+            "ai_rule": pool_by_id[r["tag_id"]].get("ai_rule", ""),
+        }
+        for r in results
+    ]
+    return {"success": True, "data": data}
+
+
 # ============================================================
 # 6. 客户日程
 # ============================================================
@@ -279,14 +348,14 @@ async def get_customer_schedules(
 
 
 # ============================================================
-# 6.1 客户日程 AI 识别（走 LangGraph 中断流程）
+# 6.1 客户日程 AI 识别（仅抽取，落库由「确认添加」接口逐条负责）
 # ============================================================
 @router.post("/customer_schedules/{external_id}/generate")
 async def generate_customer_schedules(
     external_id: str,
     current_user: dict = Depends(get_current_user),
 ):
-    """为客户 AI 识别日程（真实 LLM，待顾问确认后生效）"""
+    """为客户 AI 识别日程建议（LLM 抽取，不落库；确认添加后进入待确认列表）"""
     if current_user.get("binding_status") == "unbound":
         raise HTTPException(status_code=403, detail="员工未绑定企微账户，请先绑定")
 
@@ -302,8 +371,8 @@ async def generate_customer_schedules(
     try:
         from k12_app.backend.agent.graphs.k12_graph import run_agent
 
-        # 与 get_interrupt / confirm_interrupt 使用同一线程，保证中断可被轮询与确认
-        thread_id = f"interrupt_{current_user['user_id']}"
+        # 日程识别不进入中断，用独立线程避免与画像/标签中断线程互相干扰
+        thread_id = f"schedule_{current_user['user_id']}_{uuid.uuid4().hex[:8]}"
         wework_account_id = cust.get("wework_account_id") or current_user.get("wework_account_id", "")
 
         result = await asyncio.to_thread(
@@ -318,22 +387,124 @@ async def generate_customer_schedules(
 
         task_result = result.get("task_result") or {}
         schedules = task_result.get("data") or []
-        interrupt_id = result.get("interrupt_id")
+
+        # AI 自动确认：AI 判定客户已同意的日程与待确认日程匹配则自动转已确认
+        try:
+            ScheduleService.auto_confirm_matches(
+                external_id=external_id,
+                ai_schedules=schedules,
+                user_id=current_user["user_id"],
+                data_scope=current_user.get("data_scope", "self"),
+                wework_account_id=current_user.get("wework_account_id"),
+            )
+        except Exception as e:
+            logger.warning(f"AI 自动确认日程失败: {e}")
 
         return {
             "success": True,
             "data": {
                 "external_id": external_id,
                 "schedules": schedules,
-                "interrupt_id": interrupt_id if schedules else None,
-                "thread_id": thread_id,
+                "interrupt_id": None,
+                "thread_id": None,
             },
         }
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"识别日程失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"识别日程失败：{str(e)}")
+        raise HTTPException(status_code=500, detail="识别日程失败，请稍后重试")
+
+
+# ============================================================
+# 6.2 客户日程删除
+# ============================================================
+@router.delete("/customer_schedules/{schedule_id}")
+async def delete_customer_schedule(
+    schedule_id: int,
+    current_user: dict = Depends(get_current_user),
+):
+    """删除客户日程（按权限校验后硬删，任意状态）"""
+    if current_user.get("binding_status") == "unbound":
+        raise HTTPException(status_code=403, detail="员工未绑定企微账户，请先绑定")
+
+    s = ScheduleService.get_by_id(
+        schedule_id=schedule_id,
+        user_id=current_user["user_id"],
+        data_scope=current_user.get("data_scope", "self"),
+        wework_account_id=current_user.get("wework_account_id"),
+    )
+    if not s:
+        raise HTTPException(status_code=404, detail="日程不存在或无访问权限")
+    if not ScheduleService.delete(schedule_id):
+        raise HTTPException(status_code=404, detail="日程删除失败")
+    return {"success": True, "message": "日程已删除"}
+
+
+# ============================================================
+# 6.3 客户日程添加（待确认）/ 操作员确认
+# ============================================================
+class ScheduleAddRequest(BaseModel):
+    title: str
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    priority: str = "中"
+    source: str = "AI 识别"
+
+
+@router.post("/customer_schedules/{external_id}/add")
+async def add_customer_schedule(
+    external_id: str,
+    req: ScheduleAddRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """操作员确认 AI 建议日程 → 添加为待确认"""
+    if current_user.get("binding_status") == "unbound":
+        raise HTTPException(status_code=403, detail="员工未绑定企微账户，请先绑定")
+
+    cust = CustomerService.get_by_external_id(
+        external_id=external_id,
+        user_id=current_user["user_id"],
+        data_scope=current_user.get("data_scope", "self"),
+        wework_account_id=current_user.get("wework_account_id"),
+    )
+    if not cust:
+        raise HTTPException(status_code=404, detail="客户不存在或无访问权限")
+
+    wework_account_id = cust.get("wework_account_id") or current_user.get("wework_account_id", "")
+    follow_user_id = cust.get("follow_user_id") or current_user["user_id"]
+
+    schedule_id = ScheduleService.add_schedule_pending(
+        external_id=external_id,
+        user_id=follow_user_id,
+        wework_account_id=wework_account_id,
+        sched=req.dict(),
+        operator_id=current_user["user_id"],
+    )
+    if not schedule_id:
+        raise HTTPException(status_code=500, detail="日程添加失败")
+    return {"success": True, "message": "日程已添加（待确认）", "schedule_id": schedule_id}
+
+
+@router.post("/customer_schedules/{schedule_id}/confirm")
+async def confirm_customer_schedule(
+    schedule_id: int,
+    current_user: dict = Depends(get_current_user),
+):
+    """操作员确认待确认日程 → 已确认（此后 AI 不再改动）"""
+    if current_user.get("binding_status") == "unbound":
+        raise HTTPException(status_code=403, detail="员工未绑定企微账户，请先绑定")
+
+    s = ScheduleService.confirm_by_operator(
+        schedule_id=schedule_id,
+        confirmed_by=current_user["user_id"],
+        user_id=current_user["user_id"],
+        data_scope=current_user.get("data_scope", "self"),
+        wework_account_id=current_user.get("wework_account_id"),
+    )
+    if not s:
+        raise HTTPException(status_code=404, detail="日程不存在或无访问权限")
+    return {"success": True, "message": "日程已确认"}
 
 
 # ============================================================
@@ -358,6 +529,15 @@ async def confirm_customer_tag(
     if current_user.get("binding_status") == "unbound":
         raise HTTPException(status_code=403, detail="员工未绑定企微账户，请先绑定")
 
+    cust = CustomerService.get_by_external_id(
+        external_id=external_id,
+        user_id=current_user["user_id"],
+        data_scope=current_user.get("data_scope", "self"),
+        wework_account_id=current_user.get("wework_account_id"),
+    )
+    if not cust:
+        raise HTTPException(status_code=404, detail="客户不存在或无访问权限")
+
     success = CustomerService.add_tag(
         external_id=external_id,
         tag_id=req.tag_id,
@@ -379,6 +559,15 @@ async def remove_customer_tag(
     """移除客户标签"""
     if current_user.get("binding_status") == "unbound":
         raise HTTPException(status_code=403, detail="员工未绑定企微账户，请先绑定")
+
+    cust = CustomerService.get_by_external_id(
+        external_id=external_id,
+        user_id=current_user["user_id"],
+        data_scope=current_user.get("data_scope", "self"),
+        wework_account_id=current_user.get("wework_account_id"),
+    )
+    if not cust:
+        raise HTTPException(status_code=404, detail="客户不存在或无访问权限")
 
     success = CustomerService.remove_tag(external_id=external_id, tag_id=tag_id)
     if not success:
@@ -412,7 +601,8 @@ async def generate_customer_profile(
         from k12_app.backend.agent.graphs.k12_graph import run_agent
 
         # 与 get_interrupt / confirm_interrupt 使用同一线程，保证中断可被轮询与确认
-        thread_id = f"interrupt_{current_user['user_id']}"
+        # 按客户隔离线程，避免同一顾问多客户操作时 checkpoint 互相覆盖
+        thread_id = f"interrupt_{current_user['user_id']}_{external_id}"
         wework_account_id = cust.get("wework_account_id") or current_user.get("wework_account_id", "")
 
         # 走 LangGraph 中断流程：生成真实 LLM 画像 → 在 interrupt 节点暂停等待确认
@@ -448,7 +638,31 @@ async def generate_customer_profile(
         raise
     except Exception as e:
         logger.error(f"生成画像失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"生成画像失败：{str(e)}")
+        raise HTTPException(status_code=500, detail="生成画像失败，请稍后重试")
+
+
+# ============================================================
+# 8.1 客户画像直接确认（草稿 → 已确认，无需中断上下文）
+# ============================================================
+@router.post("/customer_profile/{external_id}/confirm")
+async def confirm_customer_profile(
+    external_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """直接确认客户最新画像草稿（已入库草稿的确认入口）"""
+    if current_user.get("binding_status") == "unbound":
+        raise HTTPException(status_code=403, detail="员工未绑定企微账户，请先绑定")
+
+    pid = ProfileService.confirm_existing(
+        external_id=external_id,
+        confirmed_by=current_user["user_id"],
+        user_id=current_user["user_id"],
+        data_scope=current_user.get("data_scope", "self"),
+        wework_account_id=current_user.get("wework_account_id"),
+    )
+    if pid is None:
+        raise HTTPException(status_code=404, detail="未找到可确认的客户画像")
+    return {"success": True, "message": "画像已确认生效"}
 
 
 # ============================================================
@@ -534,19 +748,29 @@ async def simulate_parent(
         if parent_reply and parent_reply.strip():
             try:
                 now = datetime.now()
+                # V3.3.2：模拟家长消息归属客户自己的顾问（follow_user_id），
+                # 而非当前操作人——避免同一客户的消息按操作人分散导致聊天记录缺显/乱序
+                follow_user_id = cust.get("follow_user_id") or current_user["user_id"]
+                follow_name = follow_user_id
+                if follow_user_id != current_user["user_id"]:
+                    from k12_app.backend.dao.employee_dao import EmployeeDAO
+                    emp = EmployeeDAO.get_by_user_id(follow_user_id)
+                    follow_name = (emp or {}).get("name") or follow_user_id
+                else:
+                    follow_name = current_user.get("name") or follow_user_id
                 MessageService.insert_chat_message(
-                    user_id=current_user["user_id"],
+                    user_id=follow_user_id,
                     external_id=req.external_id,
-                    wework_account_id=current_user.get("wework_account_id"),
+                    wework_account_id=cust.get("wework_account_id") or current_user.get("wework_account_id"),
                     content=parent_reply.strip(),
                     sender=req.external_id,
-                    receiver=current_user["user_id"],
+                    receiver=follow_user_id,
                     sender_name=cust.get("name"),
-                    receiver_name=current_user.get("name"),
+                    receiver_name=follow_name,
                     send_time=now,
                 )
             except Exception as e:
                 logger.warning(f"保存模拟家长回复失败: {e}")
         return {"success": True, "data": {"role": "parent", "content": parent_reply}}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI 模拟家长失败：{str(e)}")
+        raise HTTPException(status_code=500, detail="AI 模拟家长失败，请稍后重试")

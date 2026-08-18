@@ -9,7 +9,7 @@ from datetime import datetime
 from sqlalchemy import func, delete, update
 
 from k12_app.backend.dao.db import session_scope
-from k12_app.backend.models import RagKbDocument, RagKbIndexLog
+from k12_app.backend.models import RagKbDocument, RagKbIndexLog, RagKbManagedDoc
 
 
 def _doc_dict(r: RagKbDocument, with_timestamps: bool = True) -> Dict:
@@ -35,7 +35,11 @@ def _doc_dict(r: RagKbDocument, with_timestamps: bool = True) -> Dict:
 class RAGDAO:
     """RAG 知识库数据访问（全局共享，无权限过滤）"""
 
-    KB_NAMES = {"scripts", "sops", "faqs", "cases", "customer_profiles", "chat_messages"}
+    # V3.3：新增 company（集团概况）/ classes（开班计划）/ awards（荣誉资质）
+    KB_NAMES = {
+        "scripts", "sops", "faqs", "cases", "customer_profiles", "chat_messages",
+        "company", "classes", "awards",
+    }
 
     # ==================== 文档管理 ====================
 
@@ -330,3 +334,180 @@ class RAGDAO:
                 "triggered_by": r.triggered_by,
                 "created_at": r.created_at,
             }
+
+    # ==================== 资料库托管文档管理（V3.3 二期） ====================
+    # 运营在管理后台上传/替换/审核/发布文档，发布后由索引器重建向量。
+
+    MANAGED_KB_NAMES = {"company", "classes", "awards", "faqs", "sops", "scripts", "cases"}
+    DOC_STATUSES = {"draft", "reviewing", "published", "archived"}
+
+    @staticmethod
+    def _managed_doc_dict(r: RagKbManagedDoc) -> Dict:
+        return {
+            "id": r.id,
+            "doc_key": r.doc_key,
+            "kb_name": r.kb_name,
+            "title": r.title,
+            "content": r.content,
+            "doc_status": r.doc_status,
+            "version": r.version,
+            "created_by": r.created_by,
+            "reviewed_by": r.reviewed_by,
+            "review_comment": r.review_comment,
+            "reviewed_at": r.reviewed_at,
+            "published_at": r.published_at,
+            "created_at": r.created_at,
+            "updated_at": r.updated_at,
+        }
+
+    @staticmethod
+    def get_managed_doc(doc_key: str) -> Optional[Dict]:
+        """按 doc_key 查询托管文档"""
+        with session_scope() as session:
+            r = (
+                session.query(RagKbManagedDoc)
+                .filter(RagKbManagedDoc.doc_key == doc_key)
+                .first()
+            )
+            return RAGDAO._managed_doc_dict(r) if r else None
+
+    @staticmethod
+    def get_managed_doc_by_id(doc_id: int) -> Optional[Dict]:
+        """按数字 id 查询托管文档（V3.3.1：doc_key 含 / 不适合放 URL 路径，统一用 id）"""
+        with session_scope() as session:
+            r = (
+                session.query(RagKbManagedDoc)
+                .filter(RagKbManagedDoc.id == doc_id)
+                .first()
+            )
+            return RAGDAO._managed_doc_dict(r) if r else None
+
+    @staticmethod
+    def list_managed_docs(
+        kb_name: Optional[str] = None,
+        doc_status: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> Dict:
+        """查询托管文档列表"""
+        with session_scope() as session:
+            query = session.query(RagKbManagedDoc)
+            if kb_name:
+                query = query.filter(RagKbManagedDoc.kb_name == kb_name)
+            if doc_status:
+                query = query.filter(RagKbManagedDoc.doc_status == doc_status)
+
+            total = session.query(func.count()).select_from(query.subquery()).scalar()
+            rows = (
+                query.order_by(RagKbManagedDoc.kb_name, RagKbManagedDoc.doc_key)
+                .limit(page_size)
+                .offset((page - 1) * page_size)
+                .all()
+            )
+            items = [RAGDAO._managed_doc_dict(r) for r in rows]
+            return {"items": items, "total": total, "page": page, "page_size": page_size}
+
+    @staticmethod
+    def get_published_managed_docs(kb_name: Optional[str] = None) -> List[Dict]:
+        """获取已发布托管文档（索引器读取用）"""
+        with session_scope() as session:
+            query = (
+                session.query(RagKbManagedDoc)
+                .filter(RagKbManagedDoc.doc_status == "published")
+            )
+            if kb_name:
+                query = query.filter(RagKbManagedDoc.kb_name == kb_name)
+            rows = query.order_by(RagKbManagedDoc.doc_key).all()
+            return [RAGDAO._managed_doc_dict(r) for r in rows]
+
+    @staticmethod
+    def upsert_managed_doc(
+        doc_key: str,
+        kb_name: str,
+        title: str,
+        content: str,
+        doc_status: str = "draft",
+        created_by: Optional[str] = None,
+        reviewed_by: Optional[str] = None,
+        review_comment: Optional[str] = None,
+    ) -> Dict:
+        """新增或替换托管文档（替换时版本 +1 并回退为草稿等待重新审核）"""
+        if kb_name not in RAGDAO.MANAGED_KB_NAMES:
+            raise ValueError(f"无效的 kb_name: {kb_name}，允许值: {RAGDAO.MANAGED_KB_NAMES}")
+        if doc_status not in RAGDAO.DOC_STATUSES:
+            raise ValueError(f"无效的 doc_status: {doc_status}，允许值: {RAGDAO.DOC_STATUSES}")
+
+        with session_scope(commit=True) as session:
+            row = (
+                session.query(RagKbManagedDoc)
+                .filter(RagKbManagedDoc.doc_key == doc_key)
+                .first()
+            )
+            now = datetime.now()
+            if row:
+                row.title = title
+                row.content = content
+                row.kb_name = kb_name
+                row.version = row.version + 1
+                row.doc_status = doc_status
+                row.reviewed_by = reviewed_by
+                row.review_comment = review_comment
+                row.reviewed_at = now if doc_status == "published" else None
+                row.published_at = now if doc_status == "published" else None
+                row.created_by = created_by or row.created_by
+            else:
+                row = RagKbManagedDoc(
+                    doc_key=doc_key,
+                    kb_name=kb_name,
+                    title=title,
+                    content=content,
+                    doc_status=doc_status,
+                    version=1,
+                    created_by=created_by,
+                    reviewed_by=reviewed_by,
+                    review_comment=review_comment,
+                    reviewed_at=now if doc_status == "published" else None,
+                    published_at=now if doc_status == "published" else None,
+                )
+                session.add(row)
+            session.flush()
+            return RAGDAO._managed_doc_dict(row)
+
+    @staticmethod
+    def update_managed_doc_status(
+        doc_key: str,
+        doc_status: str,
+        reviewed_by: Optional[str] = None,
+        review_comment: Optional[str] = None,
+    ) -> Optional[Dict]:
+        """更新托管文档状态（审核通过 / 发布 / 归档）"""
+        if doc_status not in RAGDAO.DOC_STATUSES:
+            raise ValueError(f"无效的 doc_status: {doc_status}，允许值: {RAGDAO.DOC_STATUSES}")
+
+        with session_scope(commit=True) as session:
+            row = (
+                session.query(RagKbManagedDoc)
+                .filter(RagKbManagedDoc.doc_key == doc_key)
+                .first()
+            )
+            if not row:
+                return None
+            now = datetime.now()
+            row.doc_status = doc_status
+            if doc_status == "published":
+                row.reviewed_by = reviewed_by or row.reviewed_by
+                row.review_comment = review_comment or row.review_comment
+                row.reviewed_at = now
+                row.published_at = now
+            elif doc_status == "reviewing":
+                row.review_comment = None
+            return RAGDAO._managed_doc_dict(row)
+
+    @staticmethod
+    def delete_managed_doc(doc_key: str) -> bool:
+        """删除托管文档"""
+        with session_scope(commit=True) as session:
+            result = session.execute(
+                delete(RagKbManagedDoc).where(RagKbManagedDoc.doc_key == doc_key)
+            )
+            return result.rowcount > 0

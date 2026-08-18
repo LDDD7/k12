@@ -1,5 +1,5 @@
 """
-进程内事件总线 — 用于 SSE 实时推送（N2）
+进程内事件总线 — 用于 SSE 实时推送
 
 单进程部署下（单 uvicorn worker），发布/订阅在同一个事件循环线程内完成，
 使用 asyncio.Queue 作为订阅队列即可。发布方（如 ProfileService.confirm_profile）

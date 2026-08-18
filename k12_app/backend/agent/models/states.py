@@ -28,6 +28,10 @@ class AgentState(TypedDict):
     orders: Annotated[List[Dict], last_write_wins]
     tags: Annotated[List[Dict], last_write_wins]
     profile: Annotated[Optional[Dict], last_write_wins]
+    # ===== 二期综合推理（V3.3）=====
+    profile_items: Annotated[Optional[List[Dict]], last_write_wins]   # 已确认画像字段项
+    customer_tags: Annotated[Optional[List[Dict]], last_write_wins]   # 客户标签
+    reasoning_steps: Annotated[Optional[List[Dict]], last_write_wins]  # 推理轨迹（逐步透明展示）
     # ===== free_chat 多轮对话上下文 (V3.2 新增) =====
     chat_history: Annotated[List[Dict[str, str]], last_write_wins]
     current_response: Annotated[Optional[str], last_write_wins]

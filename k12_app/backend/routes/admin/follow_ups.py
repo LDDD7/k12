@@ -81,8 +81,13 @@ async def update_follow_up(
     current_admin: dict = Depends(get_admin_session),
 ):
     """更新跟进记录"""
-    if not FollowUpService.exists(follow_up_id):
-        raise HTTPException(status_code=404, detail="跟进记录不存在")
+    if not FollowUpService.get_by_id(
+        follow_up_id=follow_up_id,
+        user_id=current_admin["user_id"],
+        data_scope=current_admin.get("data_scope", "self"),
+        wework_account_id=current_admin.get("wework_account_id"),
+    ):
+        raise HTTPException(status_code=404, detail="跟进记录不存在或无访问权限")
 
     follow_up_time = None
     if req.follow_up_time:
@@ -114,8 +119,13 @@ async def delete_follow_up(
     current_admin: dict = Depends(get_admin_session),
 ):
     """删除跟进记录"""
-    if not FollowUpService.exists(follow_up_id):
-        raise HTTPException(status_code=404, detail="跟进记录不存在")
+    if not FollowUpService.get_by_id(
+        follow_up_id=follow_up_id,
+        user_id=current_admin["user_id"],
+        data_scope=current_admin.get("data_scope", "self"),
+        wework_account_id=current_admin.get("wework_account_id"),
+    ):
+        raise HTTPException(status_code=404, detail="跟进记录不存在或无访问权限")
 
     success = FollowUpService.delete(follow_up_id)
     if not success:

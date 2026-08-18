@@ -15,6 +15,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _thread_id_from_interrupt(interrupt_id: str, user_id: str) -> str:
+    """从 interrupt_id（int_{external}_{user}）推导该客户的线程名"""
+    if interrupt_id and interrupt_id.startswith("int_"):
+        parts = interrupt_id.split("_")
+        if len(parts) >= 3:
+            external_id = "_".join(parts[1:-1])
+            return f"interrupt_{user_id}_{external_id}"
+    return f"interrupt_{user_id}"
+
+
 class ConfirmRequest(BaseModel):
     interrupt_id: str
     confirmed: str  # ok / discard / recreate
@@ -29,20 +39,29 @@ class ConfirmRequest(BaseModel):
 
 
 @router.get("/get_interrupt")
-async def get_interrupt(current_user: dict = Depends(get_current_user)):
+async def get_interrupt(
+    external_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
     """
     轮询当前用户的待确认中断事项。
-    通过 LangGraph checkpoint 查询当前 thread 的中断状态。
+    通过 LangGraph checkpoint 查询指定客户 thread 的中断状态。
+    external_id 缺省时回退到用户级线程（向后兼容）。
     """
     user_id = current_user["user_id"]
     graph = get_graph()
 
-    # 使用用户级别的 thread_id 查询中断状态
-    config = {"configurable": {"thread_id": f"interrupt_{user_id}"}}
-    try:
-        state = graph.get_state(config)
-    except Exception:
-        state = None
+    # 优先查询指定客户的线程，否则回退用户级线程
+    thread_ids = [f"interrupt_{user_id}_{external_id}"] if external_id else [f"interrupt_{user_id}"]
+    state = None
+    for thread_id in thread_ids:
+        config = {"configurable": {"thread_id": thread_id}}
+        try:
+            state = graph.get_state(config)
+        except Exception:
+            state = None
+        if state and getattr(state, "tasks", None):
+            break
 
     try:
         if state and getattr(state, "tasks", None):
@@ -78,7 +97,12 @@ async def confirm_interrupt(
     通过 LangGraph Command 恢复图执行。
     """
     graph = get_graph()
-    thread_id = req.thread_id or f"interrupt_{current_user['user_id']}"
+
+    # 未显式传 thread_id 时，从 interrupt_id（int_{external}_{user}）推导客户线程，
+    # 避免多客户中断互相覆盖、确认到错误客户的待确认事项
+    if not req.thread_id:
+        req.thread_id = _thread_id_from_interrupt(req.interrupt_id, current_user["user_id"])
+    thread_id = req.thread_id
     config = {"configurable": {"thread_id": thread_id}}
 
     confirmed_value = req.confirmed
@@ -97,4 +121,4 @@ async def confirm_interrupt(
         }
     except Exception as e:
         logger.error(f"中断确认失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"中断处理失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="中断处理失败，请稍后重试")

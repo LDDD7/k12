@@ -17,6 +17,7 @@ from k12_app.backend.agent.llm.reply_prompt import generate_replies
 from k12_app.backend.agent.llm.tag_prompt import recommend_tags
 from k12_app.backend.agent.llm.schedule_prompt import extract_schedule
 from k12_app.backend.agent.llm.free_chat import free_chat, get_free_chat_context
+from k12_app.backend.agent.graphs.reasoning import comprehensive_reasoning_node
 from k12_app.backend.config import settings
 
 logger = logging.getLogger(__name__)
@@ -98,6 +99,34 @@ def load_tags(state: AgentState) -> AgentState:
         for group in strategy.get("groups", []):
             flat_tags.extend(group.get("tags", []))
     state["tags"] = flat_tags
+    return state
+
+
+def load_profile(state: AgentState) -> AgentState:
+    """加载客户已确认画像字段项 + 客户标签（V3.3 二期综合推理数据源）"""
+    from k12_app.backend.dao.profile_dao import ProfileDAO
+    from k12_app.backend.dao.tag_dao import TagDAO
+    external_id = state.get("external_id")
+    user_id = state.get("user_id")
+    data_scope = state.get("data_scope", "self")
+    wework_account_id = state.get("wework_account_id")
+    state["profile_items"] = []
+    state["customer_tags"] = []
+    if external_id:
+        try:
+            profile = ProfileDAO.get_by_external_id(
+                external_id, user_id, data_scope, wework_account_id
+            )
+            if profile and profile.get("status") == "已确认":
+                state["profile_items"] = ProfileDAO.get_items(profile["id"]) or []
+        except Exception as e:
+            logger.warning(f"加载客户画像失败: {e}")
+        try:
+            state["customer_tags"] = TagDAO.get_customer_tags(
+                external_id, user_id, data_scope, wework_account_id
+            )
+        except Exception as e:
+            logger.warning(f"加载客户标签失败: {e}")
     return state
 
 
@@ -279,9 +308,17 @@ def free_chat_node(state: AgentState) -> AgentState:
 
     except Exception as e:
         logger.error(f"自由对话失败: {e}")
+        # V3.3 兜底话术：嵌入顾问姓名，引导式兜底（不冷冰冰拒绝）
+        advisor_name = ""
+        emp = state.get("employee_data") or {}
+        advisor_name = emp.get("name") or ""
+        fallback = (
+            f"抱歉，我暂时无法回答这个问题，请稍后再试。"
+            + (f"如果比较着急，您的专属课程顾问{advisor_name}对这方面很了解，随时可以问她~" if advisor_name else "")
+        )
         state["task_result"] = {
             "type": "free_chat",
-            "data": "抱歉，我暂时无法回答这个问题，请稍后再试或联系管理员。"
+            "data": fallback,
         }
         state["error"] = str(e)
 
@@ -307,7 +344,7 @@ def interrupt_node(state: AgentState) -> AgentState:
         "data": task_result,
     })
 
-    # 保留用户完整选择语义：ok / discard / recreate（C-02）
+    # 保留用户完整选择语义：ok / discard / recreate
     # 兼容旧的布尔 resume 值
     if confirmed not in ("ok", "discard", "recreate"):
         confirmed = "ok" if confirmed else "discard"
@@ -316,16 +353,19 @@ def interrupt_node(state: AgentState) -> AgentState:
 
 def save_task_result_node(state: AgentState) -> AgentState:
     """中断确认后，按任务类型将结果保存到数据库（统一走 service 层）"""
+    result = state.get("task_result") or {}
+    task_type = result.get("type")
+    # 日程仅抽取不持久化（由侧边栏「确认添加」接口逐条落库为待确认）
+    if task_type == "schedule":
+        state["done"] = True
+        return state
     if state.get("confirmed") != "ok":
         state["done"] = False
         return state
 
     from k12_app.backend.services.profile_service import ProfileService
     from k12_app.backend.services.tag_service import TagService
-    from k12_app.backend.services.schedule_service import ScheduleService
 
-    result = state.get("task_result") or {}
-    task_type = result.get("type")
     data = result.get("data") or []
 
     external_id = state.get("external_id") or ""
@@ -354,16 +394,6 @@ def save_task_result_node(state: AgentState) -> AgentState:
                     tag_ids=tag_ids,
                     confirmed_by=user_id,
                 )
-        elif task_type == "schedule" and data:
-            for sched in data:
-                if isinstance(sched, dict):
-                    ScheduleService.confirm_schedule(
-                        external_id=external_id,
-                        user_id=follow_user_id,
-                        wework_account_id=wework_account_id,
-                        schedule_data=sched,
-                        confirmed_by=user_id,
-                    )
     except Exception as e:
         logger.error(f"保存任务结果失败: {e}", exc_info=True)
         state["error"] = str(e)
@@ -376,7 +406,8 @@ def save_task_result_node(state: AgentState) -> AgentState:
 # ============================================================
 
 def route_by_intent(state: AgentState) -> Literal[
-    "generate_profile", "generate_reply", "recommend_tag", "extract_schedule", "free_chat"
+    "generate_profile", "generate_reply", "recommend_tag", "extract_schedule",
+    "comprehensive_reasoning", "free_chat"
 ]:
     intent = state.get("intent", "free_chat")
     mapping = {
@@ -384,15 +415,21 @@ def route_by_intent(state: AgentState) -> Literal[
         "reply": "generate_reply",
         "tag": "recommend_tag",
         "schedule": "extract_schedule",
+        "reasoning": "comprehensive_reasoning",
         "free_chat": "free_chat",
     }
     return mapping.get(intent, "free_chat")
 
 
-def route_after_task(state: AgentState) -> Literal["interrupt", "__end__"]:
+def route_after_task(state: AgentState) -> Literal["interrupt", "save_task_result", "__end__"]:
     intent = state.get("intent", "free_chat")
-    need_confirm = {"profile", "tag", "schedule"}
-    return "interrupt" if intent in need_confirm else "__end__"
+    # 日程仅抽取不落库：由侧边栏「确认添加」接口逐条持久化，故不进入中断
+    need_confirm = {"profile", "tag"}
+    if intent in need_confirm:
+        return "interrupt"
+    if intent == "schedule":
+        return "save_task_result"
+    return "__end__"
 
 def route_after_interrupt(state: AgentState) -> Literal[
     "save_task_result", "generate_profile", "recommend_tag", "extract_schedule", "__end__"
@@ -423,11 +460,13 @@ def build_graph():
     builder.add_node("load_kf", load_kf)
     builder.add_node("load_orders", load_orders)
     builder.add_node("load_tags", load_tags)
+    builder.add_node("load_profile", load_profile)
     builder.add_node("intent_router", intent_router_node)
     builder.add_node("generate_profile", generate_profile_node)
     builder.add_node("generate_reply", generate_reply_node)
     builder.add_node("recommend_tag", recommend_tag_node)
     builder.add_node("extract_schedule", extract_schedule_node)
+    builder.add_node("comprehensive_reasoning", comprehensive_reasoning_node)
     builder.add_node("free_chat", free_chat_node)
     builder.add_node("interrupt", interrupt_node)
     builder.add_node("save_task_result", save_task_result_node)
@@ -441,7 +480,8 @@ def build_graph():
     builder.add_edge("load_chat", "load_kf")
     builder.add_edge("load_kf", "load_orders")
     builder.add_edge("load_orders", "load_tags")
-    builder.add_edge("load_tags", "intent_router")
+    builder.add_edge("load_tags", "load_profile")
+    builder.add_edge("load_profile", "intent_router")
 
     # 意图分发
     builder.add_conditional_edges(
@@ -452,6 +492,7 @@ def build_graph():
             "generate_reply": "generate_reply",
             "recommend_tag": "recommend_tag",
             "extract_schedule": "extract_schedule",
+            "comprehensive_reasoning": "comprehensive_reasoning",
             "free_chat": "free_chat",
         }
     )
@@ -460,21 +501,22 @@ def build_graph():
     builder.add_conditional_edges(
         "generate_profile",
         route_after_task,
-        {"interrupt": "interrupt", "__end__": END}
+        {"interrupt": "interrupt", "save_task_result": "save_task_result", "__end__": END}
     )
     builder.add_conditional_edges(
         "recommend_tag",
         route_after_task,
-        {"interrupt": "interrupt", "__end__": END}
+        {"interrupt": "interrupt", "save_task_result": "save_task_result", "__end__": END}
     )
     builder.add_conditional_edges(
         "extract_schedule",
         route_after_task,
-        {"interrupt": "interrupt", "__end__": END}
+        {"interrupt": "interrupt", "save_task_result": "save_task_result", "__end__": END}
     )
 
-    # 不需要中断的任务直接结束
+    # 不需要中断的任务直接结束（reply / reasoning / free_chat 仅展示，发送键在顾问手上）
     builder.add_edge("generate_reply", END)
+    builder.add_edge("comprehensive_reasoning", END)
     builder.add_edge("free_chat", END)
 
     # 中断后保存

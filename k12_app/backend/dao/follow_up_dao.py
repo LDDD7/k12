@@ -1,6 +1,6 @@
 """
 CRM 跟进记录 DAO — 操作 biz_follow_up 表（V3.1 新增，SQLAlchemy ORM）
-记录电话/试听/线下面谈/外勤拜访等非即时通讯跟进
+记录电话/试听/线下面谈/外勤等非即时通讯跟进
 与 msg_wxqy_chat 互补，形成完整客户触达时间线
 支持三维度权限过滤（owner_field = user_id）
 """
@@ -18,7 +18,7 @@ from k12_app.backend.models import BizFollowUp, BizCustomer, SysEmployee
 class FollowUpDAO:
     """跟进记录数据访问"""
 
-    FOLLOW_UP_TYPES = {"电话", "试听", "线下面谈", "外勤", "外勤拜访", "其他"}
+    FOLLOW_UP_TYPES = {"电话", "试听", "线下面谈", "外勤", "其他"}
     RESULTS = {"已联系", "未接通", "改期", "已到店", "已试听", "已成交", "拒绝", "有效联系", "有意向", "无意向", "待跟进"}
 
     @staticmethod

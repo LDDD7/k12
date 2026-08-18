@@ -10,7 +10,7 @@
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
-from sqlalchemy import func, case, delete, update
+from sqlalchemy import func, case, delete, update, select
 
 from k12_app.backend.dao.db import session_scope
 from k12_app.backend.dao.base_dao import apply_scope_conditions
@@ -373,7 +373,7 @@ class ProfileDAO:
 
     @staticmethod
     def delete(external_id: str) -> bool:
-        """删除客户画像（物理删除）"""
+        """删除客户画像（物理删除，仅最新一条）"""
         with session_scope(commit=True) as session:
             row = (
                 session.query(AiCustomerProfile)
@@ -389,6 +389,29 @@ class ProfileDAO:
                 delete(AiCustomerProfile).where(AiCustomerProfile.external_id == external_id)
             )
             return True
+
+    @staticmethod
+    def delete_all_by_external_id(external_id: str) -> int:
+        """删除某客户全部画像及字段项（V3.3.2：「清空重置」彻底清除 AI 记忆用）"""
+        with session_scope(commit=True) as session:
+            profile_ids = [
+                r[0] for r in session.execute(
+                    select(AiCustomerProfile.id).where(
+                        AiCustomerProfile.external_id == external_id
+                    )
+                ).fetchall()
+            ]
+            if not profile_ids:
+                return 0
+            session.execute(
+                delete(AiProfileItem).where(AiProfileItem.profile_id.in_(profile_ids))
+            )
+            result = session.execute(
+                delete(AiCustomerProfile).where(
+                    AiCustomerProfile.external_id == external_id
+                )
+            )
+            return result.rowcount
 
     # ==================== 画像字段项操作 ====================
 

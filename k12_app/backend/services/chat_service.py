@@ -66,6 +66,24 @@ class ChatService:
             interrupt_id = result.get("interrupt_id")
             done = result.get("done", True)
 
+            # 5.5 二期：综合推理逐步透明展示（step_start / step_result 事件）
+            reasoning_steps = result.get("reasoning_steps") or []
+            for step in reasoning_steps:
+                yield ChatService._format_event("step_start", {
+                    "step_index": step.get("step_index"),
+                    "tool": step.get("tool"),
+                    "description": step.get("description") or step.get("tool", ""),
+                    "status": "running",
+                })
+                yield ChatService._format_event("step_result", {
+                    "step_index": step.get("step_index"),
+                    "tool": step.get("tool"),
+                    "text": step.get("text", ""),
+                    "status": step.get("status", "done"),
+                    "matched": step.get("matched"),
+                    "converged": step.get("converged", False),
+                })
+
             # 6. 持久化 AI 助手回复（free_chat），保证聊天记录刷新后不丢失
             ChatService._persist_free_chat_reply(
                 intent=intent,
@@ -93,8 +111,8 @@ class ChatService:
                     "data": task_result.get("data") if task_result else None,
                 })
 
-            # 9. 记录埋点
-            await ChatService._log_task(
+            # 9. 记录埋点（返回 task_log_id 供前端反馈/行为上报）
+            task_log_id = await ChatService._log_task(
                 user_id=user_id,
                 external_id=external_id,
                 wework_account_id=wework_account_id,
@@ -104,7 +122,7 @@ class ChatService:
             )
 
             # 10. 发送完成事件
-            yield ChatService._format_event("done", {})
+            yield ChatService._format_event("done", {"task_log_id": task_log_id})
 
             logger.info(f"Agent 执行完成: user={user_id}, intent={intent}, duration={duration_ms}ms")
 
@@ -138,7 +156,8 @@ class ChatService:
                     menu_id=menu_id,
                     data_scope=data_scope,
                     # 与 get_interrupt / confirm_interrupt 使用同一线程，保证聊天触发的中断可被轮询与确认
-                    thread_id=f"interrupt_{user_id}",
+                    # 按客户隔离线程，避免同一顾问多客户操作时 checkpoint 互相覆盖
+                    thread_id=f"interrupt_{user_id}_{external_id}",
                 ),
             )
         return result
@@ -188,28 +207,44 @@ class ChatService:
         intent: str,
         result: Dict[str, Any],
         duration_ms: int,
-    ):
-        """记录任务日志（埋点）"""
+    ) -> Optional[int]:
+        """记录任务日志（埋点），返回 task_log_id（前端反馈/行为上报用）"""
         try:
             task_result = result.get("task_result", {})
             action = "shown"
             if result.get("done") and task_result:
                 action = "confirmed"
 
-            TaskLogDAO.log_task(
+            # V3.3 二期：综合推理/知识库查询的兜底与失败标记
+            action_detail = {
+                "has_result": bool(task_result),
+                "has_interrupt": bool(result.get("interrupt_id")),
+            }
+            if isinstance(task_result, dict) and task_result.get("type") == "reasoning":
+                data = task_result.get("data") or {}
+                mode = data.get("mode", "")
+                action_detail["reasoning_mode"] = mode
+                action_detail["steps"] = len(data.get("steps") or [])
+                if mode == "error":
+                    action = "failed"        # 推理失败率
+                elif mode == "simplified":
+                    action = "fallback"      # 兜底率（开关关闭退回简化模式）
+                else:
+                    action = "shown"
+
+            log_id = TaskLogDAO.log_task(
                 task_type=intent,
                 user_id=user_id,
                 external_id=external_id,
                 wework_account_id=wework_account_id,
                 action=action,
-                action_detail={
-                    "has_result": bool(task_result),
-                    "has_interrupt": bool(result.get("interrupt_id")),
-                },
+                action_detail=action_detail,
                 duration_ms=duration_ms,
             )
+            return log_id
         except Exception as e:
             logger.warning(f"任务日志记录失败: {e}")
+            return None
 
     @staticmethod
     def _format_event(event_type: str, data: Dict[str, Any]) -> str:

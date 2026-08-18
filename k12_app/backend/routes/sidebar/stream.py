@@ -1,5 +1,5 @@
 # k12_app/routes/sidebar/stream.py
-"""侧边栏 — SSE 实时推送（N2）
+"""侧边栏 — SSE 实时推送
 
 GET /api/sidebar/profile_stream/{external_id}
     订阅某客户的画像变更事件，画像确认后推送通知，前端据此自动刷新。

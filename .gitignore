@@ -97,8 +97,11 @@ k12_app/.codegraph/
 # 临时文件（本项目根目录）
 1.txt
 token.json
+_c10001_rows.json
 
 # 不上传的文档
 k12_app/docs/
+docs/
+docs/superpowers/
 上传指南.md
 操作指南.md

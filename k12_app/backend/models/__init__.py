@@ -212,6 +212,9 @@ class BizSchedule(Base):
     source = Column(String(16), nullable=False)
     status = Column(String(16), nullable=False, default="待确认")
     wx_calendar_event_id = Column(String(64))
+    confirmed_by = Column(String(64))
+    confirmed_at = Column(_datetime3())
+    confirm_source = Column(String(16))
     created_at = Column(_datetime3(), default=datetime.now)
     updated_at = Column(_datetime3(), default=datetime.now, onupdate=datetime.now)
 
@@ -444,6 +447,63 @@ class RagKbIndexLog(Base):
     created_at = Column(_datetime3(), default=datetime.now)
 
 
+# ============================================================
+# 七、二期「RAG 知识库 + 综合推理」新增模型 (V3.3)
+# ============================================================
+
+
+class SysAiConfig(Base):
+    """全局 AI 配置表 3.22 (V3.3) — 关停开关等 key-value 配置"""
+
+    __tablename__ = "sys_ai_config"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cfg_key = Column(String(64), nullable=False, unique=True)
+    cfg_value = Column(String(512), nullable=False)
+    cfg_desc = Column(String(256))
+    updated_by = Column(String(64))
+    updated_at = Column(_datetime3(), default=datetime.now, onupdate=datetime.now)
+
+
+class AiBlindSpotLog(Base):
+    """AI 盲区数据记录表 3.23 (V3.3) — 走兜底/推理失败时自动记录原始问题"""
+
+    __tablename__ = "ai_blind_spot_log"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    original_question = Column(Text, nullable=False)
+    scene_type = Column(String(16), nullable=False)   # fallback / reasoning_failed / not_found
+    kb_types = Column(String(64))
+    matched_text = Column(Text)
+    advisor_name = Column(String(64))
+    user_id = Column(String(64))
+    external_id = Column(String(64))
+    wework_account_id = Column(String(32))
+    task_log_id = Column(Integer)
+    created_at = Column(_datetime3(), default=datetime.now)
+
+
+class RagKbManagedDoc(Base):
+    """资料库托管文档表 3.24 (V3.3) — 运营上传/替换/审核/发布"""
+
+    __tablename__ = "rag_kb_managed_doc"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    doc_key = Column(String(64), nullable=False, unique=True)
+    kb_name = Column(String(32), nullable=False)
+    title = Column(String(128), nullable=False)
+    content = Column(Text, nullable=False)
+    doc_status = Column(String(16), nullable=False, default="draft")
+    version = Column(Integer, nullable=False, default=1)
+    created_by = Column(String(64))
+    reviewed_by = Column(String(64))
+    review_comment = Column(String(256))
+    reviewed_at = Column(_datetime3())
+    published_at = Column(_datetime3())
+    created_at = Column(_datetime3(), default=datetime.now)
+    updated_at = Column(_datetime3(), default=datetime.now, onupdate=datetime.now)
+
+
 __all__ = [
     "Base",
     "SysWeworkAccount",
@@ -468,4 +528,7 @@ __all__ = [
     "MsgWxkfChat",
     "RagKbDocument",
     "RagKbIndexLog",
+    "SysAiConfig",
+    "AiBlindSpotLog",
+    "RagKbManagedDoc",
 ]

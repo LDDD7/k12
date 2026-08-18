@@ -17,6 +17,7 @@ from k12_app.backend.rag.embeddings import embed_query
 logger = logging.getLogger(__name__)
 
 CHROMA_PATH = Path(__file__).parent.parent.parent / "chroma_data"
+# V3.3 二期新增：company（集团概况）/ classes（开班计划）/ awards（荣誉资质）
 COLLECTION_MAP = {
     "scripts": "k12_scripts",
     "sops": "k12_sops",
@@ -24,6 +25,9 @@ COLLECTION_MAP = {
     "cases": "k12_cases",
     "customer_profiles": "k12_customer_profiles",
     "chat_messages": "k12_chat_messages",
+    "company": "k12_company",
+    "classes": "k12_classes",
+    "awards": "k12_awards",
 }
 
 # 全局复用客户端与 collection 缓存：PersistentClient 初始化会加载磁盘索引，
@@ -52,6 +56,21 @@ def _get_collection(kb_name: str):
         col = None
     _collection_cache[kb_name] = col
     return col
+
+
+def invalidate_collection_cache(kb_name: Optional[str] = None) -> None:
+    """
+    失效检索缓存（V3.3 二期：资料库一键发布/重建索引后调用）。
+
+    背景：_get_collection 会把"不存在的 Collection"缓存为 None，
+    若随后才完成索引构建，本进程内仍检索不到——与"运营后台一键生效、无需重启"的要求冲突。
+    索引构建成功后调用本函数清缓存（kb_name=None 清全部）。
+    """
+    global _collection_cache
+    if kb_name is None:
+        _collection_cache = {}
+    else:
+        _collection_cache.pop(kb_name, None)
 
 
 def _to_result_list(results: Any) -> List[Dict[str, Any]]:
@@ -248,18 +267,23 @@ def retrieve_chat_messages(
     top_k: int = 10,
     external_id: Optional[str] = None,
     user_id: Optional[str] = None,
+    scope_user_id: Optional[str] = None,
+    data_scope: str = "self",
 ) -> List[Dict[str, Any]]:
     """
     语义检索聊天记录。
 
     从已向量化的企微聊天记录中搜索与查询最相关的历史消息。
     可选按 external_id（客户）或 user_id（顾问）过滤。
+    data_scope="self" 时强制附加调用者 user_id 过滤，防止跨顾问泄露。
 
     Args:
         query: 搜索查询（如 "几何薄弱 怎么回复"、"试听课后跟进"）
         top_k: 返回数量
         external_id: 可选，按客户 ID 过滤
         user_id: 可选，按顾问 ID 过滤
+        scope_user_id: 调用者 user_id（self 范围强制过滤）
+        data_scope: 调用者数据权限范围（self/region/all）
 
     Returns:
         [{id, text, metadata, score}, ...]
@@ -273,19 +297,23 @@ def retrieve_chat_messages(
 
     query_embedding = embed_query(query)
 
+    # 强制 self 范围仅检索调用者本人消息；其余范围允许按请求参数过滤
+    scope_user_id = scope_user_id if data_scope == "self" else None
+
     # 构建 ChromaDB where 过滤条件
     where_filter = None
-    if external_id and user_id:
-        where_filter = {
-            "$and": [
-                {"external_id": external_id},
-                {"user_id": user_id},
-            ]
-        }
-    elif external_id:
-        where_filter = {"external_id": external_id}
-    elif user_id:
-        where_filter = {"user_id": user_id}
+    clauses = []
+    if scope_user_id:
+        clauses.append({"user_id": scope_user_id})
+    if external_id:
+        clauses.append({"external_id": external_id})
+    if user_id and not scope_user_id:
+        clauses.append({"user_id": user_id})
+
+    if len(clauses) == 1:
+        where_filter = clauses[0]
+    elif len(clauses) > 1:
+        where_filter = {"$and": clauses}
 
     results = collection.query(
         query_embeddings=[query_embedding],
@@ -293,3 +321,62 @@ def retrieve_chat_messages(
         where=where_filter,
     )
     return _to_result_list(results)
+
+
+# ============================================================
+# V3.3 二期新增：集团知识库（第一层）
+# ============================================================
+
+def retrieve_kb(
+    kb_name: str,
+    query: str,
+    top_k: int = 3,
+) -> List[Dict[str, Any]]:
+    """
+    通用集团知识库检索（company / classes / awards / faqs）。
+
+    Args:
+        kb_name: 知识库类型（company=集团概况 / classes=开班计划 / awards=荣誉资质 / faqs=FAQ）
+        query: 用户问题
+        top_k: 返回数量
+
+    Returns:
+        [{id, text, metadata, score}, ...]
+    """
+    if kb_name not in COLLECTION_MAP:
+        raise ValueError(f"无效的知识库: {kb_name}，允许值: {list(COLLECTION_MAP.keys())}")
+    collection = _get_collection(kb_name)
+    if not collection:
+        logger.warning(f"{COLLECTION_MAP[kb_name]} Collection 不存在，请先执行 reindex")
+        return []
+
+    query_embedding = embed_query(query)
+    results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=top_k,
+    )
+    return _to_result_list(results)
+
+
+def retrieve_company_info(
+    question: str,
+    top_k: int = 3,
+) -> List[Dict[str, Any]]:
+    """检索集团概况（成立年限/规模/简介）"""
+    return retrieve_kb("company", question, top_k)
+
+
+def retrieve_class_info(
+    question: str,
+    top_k: int = 3,
+) -> List[Dict[str, Any]]:
+    """检索开班计划（学期/暑期班、课程、价格）"""
+    return retrieve_kb("classes", question, top_k)
+
+
+def retrieve_awards(
+    question: str,
+    top_k: int = 3,
+) -> List[Dict[str, Any]]:
+    """检索荣誉资质（奖项、颁发机构、年份）"""
+    return retrieve_kb("awards", question, top_k)

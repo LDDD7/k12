@@ -54,6 +54,16 @@ class OrderService:
         return OrderDAO.get_by_union_id(union_id, user_id, data_scope, wework_account_id)
 
     @staticmethod
+    def get_by_order_id(
+        order_id: str,
+        user_id: str,
+        data_scope: str,
+        wework_account_id: Optional[str],
+    ) -> Optional[Dict]:
+        """按订单号查询订单（带权限过滤）"""
+        return OrderDAO.get_by_order_id(order_id, user_id, data_scope, wework_account_id)
+
+    @staticmethod
     def exists(order_id: str) -> bool:
         """检查订单是否存在"""
         return OrderDAO.exists(order_id)

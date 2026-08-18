@@ -1,5 +1,5 @@
 # k12_app/services/reply_service.py
-"""回复建议与家长模拟服务 — 从路由层拆分的业务逻辑（Q-04）"""
+"""回复建议与家长模拟服务 — 从路由层拆分的业务逻辑"""
 
 import hashlib
 import logging
@@ -170,7 +170,22 @@ def simulate_parent_reply(cust: dict, messages: Optional[List[dict]] = None) -> 
         if content.strip():
             llm_messages.append({"role": role, "content": content})
 
-    llm_messages.append({"role": "user", "content": "请以上述家长的身份，回复顾问最后一条消息。"})
+    if messages:
+        # 有历史对话 → 以家长身份回复顾问最后一条消息
+        llm_messages.append({"role": "user", "content": "请以上述家长的身份，回复顾问最后一条消息。"})
+    else:
+        # V3.3.2：无历史（如刚清空）→ 让家长主动发起话题，避免模型对着不存在的"最后一条消息"空转
+        llm_messages.append({"role": "user",
+                             "content": "请以上述家长的身份，自然地给顾问发一条消息开启对话（例如咨询孩子学习情况或课程安排）。"})
 
-    parent_reply = chat_completion(llm_messages, temperature=0.85, max_tokens=300)
-    return parent_reply.strip()
+    try:
+        parent_reply = chat_completion(llm_messages, temperature=0.85, max_tokens=300)
+        parent_reply = (parent_reply or "").strip()
+    except Exception as e:
+        logger.warning(f"模拟家长回复调用失败: {e}")
+        parent_reply = ""
+
+    # V3.3.2：LLM 返回空时给温和兜底，避免前端"没反应"
+    if not parent_reply:
+        parent_reply = "嗯嗯，我再跟孩子商量一下，回头给您答复哈~"
+    return parent_reply

@@ -42,6 +42,10 @@ class ScheduleDAO:
                     BizSchedule.user_id,
                     BizSchedule.created_at,
                     BizSchedule.updated_at,
+                    BizSchedule.confirmed_by,
+                    BizSchedule.confirmed_at,
+                    BizSchedule.confirm_source,
+                    BizSchedule.source,
                     BizCustomer.name.label("customer_name"),
                 )
                 .outerjoin(BizCustomer, BizCustomer.external_id == BizSchedule.external_id)
@@ -77,7 +81,11 @@ class ScheduleDAO:
                     "user_id": r.user_id,
                     "created_at": r.created_at,
                     "updated_at": r.updated_at,
+                    "source": r.source,
                     "customer_name": r.customer_name,
+                    "confirmed_by": r.confirmed_by,
+                    "confirmed_at": r.confirmed_at,
+                    "confirm_source": r.confirm_source,
                 }
                 for r in rows
             ]
@@ -138,6 +146,9 @@ class ScheduleDAO:
                     "wx_calendar_event_id": r.wx_calendar_event_id,
                     "created_at": r.created_at,
                     "updated_at": r.updated_at,
+                    "confirmed_by": r.confirmed_by,
+                    "confirmed_at": r.confirmed_at,
+                    "confirm_source": r.confirm_source,
                 }
                 for r in rows
             ]
@@ -178,6 +189,9 @@ class ScheduleDAO:
                 "wx_calendar_event_id": r.wx_calendar_event_id,
                 "created_at": r.created_at,
                 "updated_at": r.updated_at,
+                "confirmed_by": r.confirmed_by,
+                "confirmed_at": r.confirmed_at,
+                "confirm_source": r.confirm_source,
             }
 
     @staticmethod
@@ -212,6 +226,9 @@ class ScheduleDAO:
                     "source": r.source,
                     "status": r.status,
                     "wx_calendar_event_id": r.wx_calendar_event_id,
+                    "confirmed_by": r.confirmed_by,
+                    "confirmed_at": r.confirmed_at,
+                    "confirm_source": r.confirm_source,
                 }
                 for r in rows
             ]
@@ -301,6 +318,45 @@ class ScheduleDAO:
             return result.rowcount > 0
 
     @staticmethod
+    def confirm_by_operator(schedule_id: int, confirmed_by: str) -> bool:
+        """操作员确认（待确认 → 已确认，或 AI 已确认升级为操作员确认），锁定后 AI 不可再改"""
+        with session_scope(commit=True) as session:
+            result = session.execute(
+                update(BizSchedule)
+                .where(
+                    BizSchedule.id == schedule_id,
+                    (BizSchedule.status == "待确认")
+                    | ((BizSchedule.status == "已确认") & (BizSchedule.confirm_source == "ai")),
+                )
+                .values(
+                    status="已确认",
+                    confirmed_by=confirmed_by,
+                    confirmed_at=datetime.now(),
+                    confirm_source="operator",
+                )
+            )
+            return result.rowcount > 0
+
+    @staticmethod
+    def confirm_by_ai(schedule_id: int) -> bool:
+        """AI 自动确认（仅待确认 → 已确认），操作员已确认的日程不被改动"""
+        with session_scope(commit=True) as session:
+            result = session.execute(
+                update(BizSchedule)
+                .where(
+                    BizSchedule.id == schedule_id,
+                    BizSchedule.status == "待确认",
+                )
+                .values(
+                    status="已确认",
+                    confirmed_by="AI",
+                    confirmed_at=datetime.now(),
+                    confirm_source="ai",
+                )
+            )
+            return result.rowcount > 0
+
+    @staticmethod
     def mark_synced(schedule_id: int, wx_calendar_event_id: str) -> bool:
         """标记已同步企微日历（已确认 → 已同步企微日历）"""
         with session_scope(commit=True) as session:
@@ -308,6 +364,17 @@ class ScheduleDAO:
                 update(BizSchedule)
                 .where(BizSchedule.id == schedule_id, BizSchedule.status == "已确认")
                 .values(status="已同步企微日历", wx_calendar_event_id=wx_calendar_event_id)
+            )
+            return result.rowcount > 0
+
+    @staticmethod
+    def set_wx_event(schedule_id: int, wx_calendar_event_id: str) -> bool:
+        """记录企微日历事件 ID（不改动状态，确认后保持「已确认」）"""
+        with session_scope(commit=True) as session:
+            result = session.execute(
+                update(BizSchedule)
+                .where(BizSchedule.id == schedule_id)
+                .values(wx_calendar_event_id=wx_calendar_event_id)
             )
             return result.rowcount > 0
 
@@ -335,12 +402,10 @@ class ScheduleDAO:
 
     @staticmethod
     def delete(schedule_id: int) -> bool:
-        """物理删除日程（仅已完成状态可删除）"""
+        """物理删除日程（任意状态，权限校验由调用方负责）"""
         with session_scope(commit=True) as session:
             result = session.execute(
-                delete(BizSchedule).where(
-                    BizSchedule.id == schedule_id, BizSchedule.status == "已完成"
-                )
+                delete(BizSchedule).where(BizSchedule.id == schedule_id)
             )
             return result.rowcount > 0
 

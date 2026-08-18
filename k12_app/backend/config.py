@@ -26,7 +26,7 @@ class Settings:
     if not JWT_SECRET_KEY:
         raise ValueError("JWT_SECRET_KEY 未配置，请检查 .env 文件")
 
-    # Session 签名密钥与 JWT 密钥分离（S-05）：未显式配置时从 JWT 密钥派生
+    # Session 签名密钥与 JWT 密钥分离：未显式配置时从 JWT 密钥派生
     SESSION_SECRET_KEY = os.getenv("SESSION_SECRET_KEY") or hashlib.sha256(
         ("session:" + JWT_SECRET_KEY).encode("utf-8")
     ).hexdigest()
@@ -58,6 +58,9 @@ class Settings:
     # DashScope（Embedding）
     DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY")
 
+    # 启动时自动补建缺失的向量索引（问题 3 修复；best-effort，失败不影响启动）
+    AUTO_INDEX_ON_STARTUP = os.getenv("AUTO_INDEX_ON_STARTUP", "true").lower() == "true"
+
     # 聊天记录缓冲区转存向量库阈值
     CHAT_FLUSH_THRESHOLD = int(os.getenv("CHAT_FLUSH_THRESHOLD", 30))
 
@@ -67,7 +70,7 @@ class Settings:
         str(Path(__file__).parent / "data" / "checkpoints.sqlite"),
     )
 
-    # CORS 允许的来源（S-02）：逗号分隔，为空则不允许任何跨域（前后端同源部署）
+    # CORS 允许的来源：逗号分隔，为空则不允许任何跨域（前后端同源部署）
     CORS_ALLOWED_ORIGINS = [
         o.strip()
         for o in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")

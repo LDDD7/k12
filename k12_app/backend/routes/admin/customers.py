@@ -74,8 +74,14 @@ async def update_customer(
     current_admin: dict = Depends(get_admin_session),
 ):
     """编辑客户信息"""
-    if not CustomerService.exists(external_id):
-        raise HTTPException(status_code=404, detail="客户不存在")
+    cust = CustomerService.get_by_external_id(
+        external_id=external_id,
+        user_id=current_admin["user_id"],
+        data_scope=current_admin["data_scope"],
+        wework_account_id=current_admin.get("wework_account_id"),
+    )
+    if not cust:
+        raise HTTPException(status_code=404, detail="客户不存在或无访问权限")
 
     success = CustomerService.update(
         external_id=external_id,
@@ -239,6 +245,15 @@ async def update_schedule(
     current_admin: dict = Depends(get_admin_session),
 ):
     """更新日程"""
+    s = ScheduleService.get_by_id(
+        schedule_id=schedule_id,
+        user_id=current_admin["user_id"],
+        data_scope=current_admin.get("data_scope", "self"),
+        wework_account_id=current_admin.get("wework_account_id"),
+    )
+    if not s:
+        raise HTTPException(status_code=404, detail="日程不存在或无访问权限")
+
     success = ScheduleService.update_schedule(
         schedule_id=schedule_id,
         title=req.title,
@@ -248,5 +263,69 @@ async def update_schedule(
         status=req.status,
     )
     if not success:
-        raise HTTPException(status_code=404, detail="日程不存在或更新失败")
+        raise HTTPException(status_code=404, detail="日程更新失败")
     return {"success": True, "message": "日程更新成功"}
+
+
+class ScheduleCreateRequest(BaseModel):
+    external_id: str
+    title: str
+    start_time: str
+    end_time: Optional[str] = None
+    priority: str = "中"
+
+
+@router.post("/schedules")
+async def create_schedule(
+    req: ScheduleCreateRequest,
+    current_admin: dict = Depends(get_admin_session),
+):
+    """管理后台手动新增日程（状态：待确认，来源：人工创建）"""
+    cust = CustomerService.get_by_external_id(
+        external_id=req.external_id,
+        user_id=current_admin["user_id"],
+        data_scope=current_admin.get("data_scope", "self"),
+        wework_account_id=current_admin.get("wework_account_id"),
+    )
+    if not cust:
+        raise HTTPException(status_code=404, detail="客户不存在或无访问权限")
+
+    follow_user_id = cust.get("follow_user_id") or current_admin["user_id"]
+    wework_account_id = cust.get("wework_account_id") or current_admin.get("wework_account_id", "")
+
+    schedule_id = ScheduleService.add_schedule_pending(
+        external_id=req.external_id,
+        user_id=follow_user_id,
+        wework_account_id=wework_account_id,
+        sched={
+            "title": req.title,
+            "start_time": dt.fromisoformat(req.start_time),
+            "end_time": dt.fromisoformat(req.end_time) if req.end_time else None,
+            "priority": req.priority,
+            "source": "人工创建",
+        },
+        operator_id=current_admin["user_id"],
+    )
+    if not schedule_id:
+        raise HTTPException(status_code=500, detail="日程添加失败")
+    return {"success": True, "data": {"schedule_id": schedule_id}}
+
+
+@router.delete("/schedules/{schedule_id}")
+async def delete_schedule(
+    schedule_id: int,
+    current_admin: dict = Depends(get_admin_session),
+):
+    """删除日程（任意状态）"""
+    s = ScheduleService.get_by_id(
+        schedule_id=schedule_id,
+        user_id=current_admin["user_id"],
+        data_scope=current_admin.get("data_scope", "self"),
+        wework_account_id=current_admin.get("wework_account_id"),
+    )
+    if not s:
+        raise HTTPException(status_code=404, detail="日程不存在或无访问权限")
+
+    if not ScheduleService.delete(schedule_id):
+        raise HTTPException(status_code=404, detail="日程删除失败")
+    return {"success": True, "message": "日程删除成功"}
